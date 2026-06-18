@@ -1,0 +1,25 @@
+{
+    "luci-app-ssr-plus2": {
+        "description": "Grant UCI access for luci-app-ssr-plus2",
+        "read": {
+            "ubus": {
+                "luci.ssr-plus2": [ "updateAdvancedAddress", "latency" ]
+            },
+            "file": {
+                "/etc/ssr-plus2/*": [ "read" ],
+                "/var/log/ssr-plus2.log": [ "read" ],
+                "/tmp/ssr-plus2/*.out": [ "read" ],
+                "/etc/init.d/ssr-plus2": [ "exec" ]
+            },
+            "uci": ["ssr-plus2"]
+        },
+        "write": {
+            "file": {
+                "/etc/ssr-plus2/*": [ "write" ],
+                "/var/log/ssr-plus2.log": [ "write" ],
+                "/tmp/ssr-plus2/*.out": [ "write" ]
+            },
+            "uci": ["ssr-plus2"]
+        }
+    }
+}

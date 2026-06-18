@@ -1,0 +1,1457 @@
+#!/bin/sh /etc/rc.common
+#
+# This is free software, licensed under the GNU General Public License v3.
+# See /LICENSE for more information.
+#
+# 引入公共方法
+. /usr/share/ssr-plus2/utils.sh
+
+# 启动顺序
+START=95
+# 关闭顺序
+STOP=15
+# 服务方式
+SERVICE_DAEMONIZE=1
+
+# 自定义命令
+EXTRA_COMMANDS='status updateAdvancedAddress mycurl list readLog latency'
+# 自定义命令 帮助
+EXTRA_HELP="        status          Get status,starting/running/inactive"
+EXTRA_HELP="${EXTRA_HELP}\n        reset           Reset to default settings"
+EXTRA_HELP="${EXTRA_HELP}\n        mycurl          invocation curl command(solve direct invocation data not full return when timeout)"
+EXTRA_HELP="${EXTRA_HELP}\n        updateAdvancedAddress"
+EXTRA_HELP="${EXTRA_HELP}\n        list            list file"
+EXTRA_HELP="${EXTRA_HELP}\n        readLog         read log file"
+EXTRA_HELP="${EXTRA_HELP}\n        latency          "
+
+
+# 配置文件名称
+CONFIG_NAME=ssr-plus2
+
+# 加 export 子脚本中也可使用
+export PACKAGE_NAME="ssr-plus2"
+
+# 锁定文件
+LOCK_FILE=/var/lock/ssr-plus2.lock
+# 日志文件
+export LOG_FILE=/var/log/ssr-plus2.log
+# 动态生成配置文件路径
+export TEMP_PATH=/tmp/ssr-plus2
+# pid文件
+PID_FILE=${TEMP_PATH}/pid
+# 已代理 address 文件
+ADDRESS_FILE=${TEMP_PATH}/address
+# 已 强制代理 域名 文件
+FORCE_FILE=${TEMP_PATH}/force
+
+# 自定义 dnsmasq 文件名称
+DNSMASQ_CONFIG_NAME="dnsmasq-ssr-plus2.conf"
+# 自定义 dnsmasq 目录名称
+DNSMASQ_CONFIG_PATH_NAME="dnsmasq-ssr-plus2.d"
+
+
+# 设置 DNSMASQ_CONF_DIR 和 DNSMASQ_CONFIG_PATH
+if [ -f /etc/openwrt_release ]; then
+    # 获取默认的 DNSMASQ 配置 ID
+    DEFAULT_DNSMASQ_CFGID="$(uci -q show "dhcp.@dnsmasq[0]" | awk 'NR==1 {split($0, conf, /[.=]/); print conf[2]}')"
+    # 从 conf-dir 行中提取配置目录路径
+    if [ -f "/tmp/etc/dnsmasq.conf.$DEFAULT_DNSMASQ_CFGID" ]; then
+        DNSMASQ_CONF_DIR="$(awk -F '=' '/^conf-dir=/ {print $2}' "/tmp/etc/dnsmasq.conf.$DEFAULT_DNSMASQ_CFGID")"
+    else
+        DNSMASQ_CONF_DIR="/tmp/dnsmasq.d"
+    fi
+    # 设置 DNSMASQ_CONFIG_PATH 并去除路径末尾的斜杠
+    DNSMASQ_CONFIG_PATH="${DNSMASQ_CONF_DIR%*/}/${DNSMASQ_CONFIG_PATH_NAME}"
+fi
+
+# 透明代理 标识
+tproxyMark="0x01"
+
+# 是否有 dns2socks-rust
+dns2socksRustCount=`command -v dns2socks-rust | wc -l`
+
+# 是否有 iptables
+iptablesCount=`command -v iptables | wc -l`
+
+# 是否有 ip6tables
+ip6tablesCount=`command -v ip6tables | wc -l`
+
+# 是否有 nft
+nftCount=`command -v nft | wc -l`
+
+# dnsmasq 是否有 nftset
+nftsetCount=`dnsmasq -v | grep nftset | wc -l`
+
+if [ "${nftsetCount}" == "0" ]; then
+    # dnsmasq 无 nftset
+    # 强制设置 为 0
+    nftCount=0
+fi
+
+# nft 是否有 nft_tproxy 模块
+nftTProxyCount=`lsmod | grep nft_tproxy | wc -l`
+
+if [ "${nftTProxyCount}" != "0" ]; then
+    # 存在 因为数量可能大于1 为了后面判断方便 设置 为 1 
+    nftTProxyCount="1"
+fi
+
+# nft 表名
+nftTableName="ssr-plus2-global"
+
+# 网络工具 1 iptables 2 nft
+NET_TOOL=1
+
+if [ "${nftCount}" == "1" ]; then
+    # 使用 nft
+    NET_TOOL=2
+elif [ "${iptablesCount}" == "1" ]; then
+    # 使用 iptables
+    NET_TOOL=1
+else
+    # 
+    echolog "无防火墙工具"
+fi
+
+
+# 是否开启路由器代理
+ROUTER_PROXY="0"
+
+
+# 设置锁
+set_lock() {
+    exec 1000>"$LOCK_FILE"
+    flock -xn 1000
+}
+
+
+# 解锁
+unset_lock() {
+    flock -u 1000
+    rm -rf "$LOCK_FILE"
+}
+
+
+# 等待解锁
+unlock() {
+    local failcount=1
+    while [ "$failcount" -le 10 ]; do
+        if [ -f "$LOCK_FILE" ]; then
+            let "failcount++"
+            sleep 1s
+            [ "$failcount" -ge 10 ] && unset_lock
+        else
+            break
+        fi
+    done
+}
+
+
+# 启动
+start() {
+    # 设置锁
+    set_lock
+    # 输出日志
+    echolog "----------start------------"
+    
+    # 是否运行
+    local isRun=$(status)
+
+    if [ "${isRun}" == "running" ]; then
+        echolog "----------already running------------"
+        echolog "----------end------------"
+        # 解锁
+        unset_lock
+        return
+    fi
+
+    # 是否开启
+    local enableProxy=$(uci_get_by_section client 0 enable_proxy)
+    
+    if [ "${enableProxy}" == "0" ]; then
+        echolog "----------not enable_proxy------------"
+        echolog "----------end------------"
+        # 解锁
+        unset_lock
+        return
+    fi
+    
+    
+    # 新建目录
+    mkdir -p /var/run /var/lock /var/log ${TEMP_PATH} ${DNSMASQ_CONF_DIR} ${DNSMASQ_CONFIG_PATH}
+    # 设置 ssr 自定义 域名目录
+    echo "conf-dir=${DNSMASQ_CONFIG_PATH}" >"${DNSMASQ_CONF_DIR}/${DNSMASQ_CONFIG_NAME}"
+    
+    # 规则 索引
+    local ruleIndex=0
+
+    # 运行 的索引
+    local runRuleIndex=""
+
+
+
+
+    if [ "${NET_TOOL}" == "2" ]; then
+        # nft
+        `nft add table inet ${nftTableName}`
+    fi
+
+
+    echolog "----------rule start------------"
+
+    # 循环操作
+    while true
+    do
+        # 判断rule 是否存在
+        local rule=`uci get ${PACKAGE_NAME}.@rule[${ruleIndex}] 2>/dev/null`
+        
+        # echo "rule:${rule}"
+
+        if [ "${rule}" != "rule" ]; then
+            # 不存在 结束循环
+            break
+        fi
+
+
+        echolog "----------rule ${ruleIndex}------------"
+
+        # 节点 cfgid
+        local cfgid=$(uci_get_by_section rule ${ruleIndex} node)
+        # 代理内网设备
+        local proxyDevice=$(uci_get_by_section rule ${ruleIndex} proxy_device)
+        # 代理地址列表
+        local proxyAddress=$(uci_get_by_section rule ${ruleIndex} proxy_address)
+        # 代理地址列表
+        local proxyNode=$(uci_get_by_section rule ${ruleIndex} proxy_node)
+        # 代理端口
+        local proxyPort=$(uci_get_by_section rule ${ruleIndex} proxy_port)
+        # dns服务器
+        local dnsServer=$(uci_get_by_section rule ${ruleIndex} dns_server)
+        # 是否过滤 IPv4
+        local filterA=$(uci_get_by_section rule ${ruleIndex} filter_A)
+        # 是否过滤 IPv6
+        local filterAAA=$(uci_get_by_section rule ${ruleIndex} filter_AAAA)
+        # 跳过代理地址
+        local pass=$(uci_get_by_section rule ${ruleIndex} pass)
+        # 强制代理地址
+        local force=$(uci_get_by_section rule ${ruleIndex} force)
+        # 是否启用
+        local enable=$(uci_get_by_section rule ${ruleIndex} enable)
+
+
+#        echo "cfgid:${cfgid}"
+#        echo "proxyDevice:${proxyDevice}"
+#        echo "proxyAddress:${proxyAddress}"
+#        echo "pass:${pass}"
+#        echo "force:${force}"
+
+        # 节点是否启用
+        if [ "${enable}" == "0" ]; then
+            echolog "----------rule ${ruleIndex} not enable------------"
+            # +1
+            ruleIndex=$((ruleIndex+1))
+            continue
+        fi
+
+        
+        # 节点是否存在
+        local node=`uci get ${PACKAGE_NAME}.${cfgid} 2>/dev/null`
+        # echo "node:${node}"
+
+        if [ "${node}" != "node" ]; then
+            echolog "----------rule ${ruleIndex} node not exist------------"
+            # +1
+            ruleIndex=$((ruleIndex+1))
+            continue
+        fi
+
+
+        echolog "----------rule ${ruleIndex} proxy start------------"
+
+
+        # 启动代理
+        local resultPort=`sh /usr/share/ssr-plus2/proxy.sh ${ruleIndex} ${cfgid}`
+        
+        # echo "${resultPort}"
+        
+        if [ "${resultPort}" == "" ]; then
+            # 启动失败
+            echolog "----------rule ${ruleIndex} proxy start fail------------"
+            echolog "----------rule ${ruleIndex} proxy end------------"
+            # +1
+            ruleIndex=$((ruleIndex+1))
+            continue            
+        fi
+
+        echolog "----------rule ${ruleIndex} proxy end------------"
+
+
+        # 保存 运行的索引
+        runRuleIndex="${runRuleIndex} ${ruleIndex}"
+
+
+        # 获取端口
+        # socks5 端口
+        local socks5Port=`echo -n "${resultPort}" | awk -F ',' '{print $1}'`
+        # redirect 端口
+        local redirectPort=`echo -n "${resultPort}" | awk -F ',' '{print $2}'`
+        # tproxy 端口
+        local tproxyPort=`echo -n "${resultPort}" | awk -F ',' '{print $3}'`
+        
+        if [ "${tproxyPort}" == "" ]; then
+            # 
+            tproxyPort=${redirectPort}
+        fi
+        
+        
+        # dns 端口
+        local dnsPort=$(get_port)
+        
+        # 处理过滤 条件
+        local dnsFilter=""
+        if [ "${filterA}" == "1" ]; then
+            dnsFilter=" ${dnsFilter} -4 "
+        fi
+        
+        if [ "${filterAAA}" == "1" ]; then
+            dnsFilter=" ${dnsFilter} -6 "
+        fi
+        
+        echolog "----------rule ${ruleIndex} dns start------------"
+
+
+        # 启动 dns
+        if [ "${dns2socksRustCount}" == "1" ]; then
+            # dns2socks-rust
+            dns2socks-rust -s socks5://127.0.0.1:${socks5Port} -d ${dnsServer} -l 127.0.0.1:${dnsPort} -f -c ${dnsFilter} -v trace > ${TEMP_PATH}/dns-${ruleIndex}.out 2>&1 &
+        else
+            # dns2socks
+            dns2socks 127.0.0.1:${socks5Port} ${dnsServer} 127.0.0.1:${dnsPort} ${dnsFilter} > ${TEMP_PATH}/dns-${ruleIndex}.out &
+        fi
+
+
+        # 将进程ID 保存到文件
+        echo "$!" >> ${PID_FILE}
+
+
+        echolog "----------rule ${ruleIndex} dns end------------"
+
+
+        # 创建 ipset
+        # ipv4
+        local v4="ssr-plus2-${ruleIndex}-v4"
+        # ipv6
+        local v6="ssr-plus2-${ruleIndex}-v6"
+
+
+        if [ "${NET_TOOL}" == "1" ]; then
+            # iptables
+
+            # ipv4 ipset
+            `ipset -! create ${v4} hash:net`
+            # 创建 ipv4 代理链
+            # tcp
+            `iptables -w -t nat -N ${v4}`
+            # udp
+            `iptables -w -t mangle -N ${v4}`
+
+
+            if [ "${ip6tablesCount}" == "1" ]; then
+                # ipv6 ipset
+                `ipset -! create ${v6} hash:net family inet6`
+                # 创建 ipv6 代理链
+                # tcp
+                `ip6tables -w -t nat -N ${v6}`
+                # udp
+                `ip6tables -w -t mangle -N ${v6}`
+            fi
+            
+
+        elif [ "${NET_TOOL}" == "2" ]; then
+            # nft
+            
+            `nft add set inet ${nftTableName} ${v4} { type ipv4_addr \\; flags interval \\;}`
+            `nft add set inet ${nftTableName} ${v6} { type ipv6_addr \\; flags interval \\;}`
+
+
+            # 创建 节点代理链
+            # nft 不需要 区分 v4 v6
+            # tcp
+            `nft add chain inet ${nftTableName} ssr-plus2-${ruleIndex}-tcp`
+            # udp
+            if [ "${nftTProxyCount}" == "1" ]; then
+                # 有模块
+                `nft add chain inet ${nftTableName} ssr-plus2-${ruleIndex}-udp`
+            fi
+        fi
+
+
+        echolog "----------rule ${ruleIndex} proxyDevice start------------"
+
+
+        
+        # local hosts=`ubus call luci-rpc getHostHints`
+
+        # 代理内网IP
+        for device in ${proxyDevice}
+        do
+            # echo "ip:${ip}"
+
+            for ip in `lua /usr/share/ssr-plus2/device-ip.lua ${device}`
+            do
+                # 代理规则
+                if [[ "${ip}" =~ "^[0-9]{0,3}\.[0-9]{0,3}\.[0-9]{0,3}\.[0-9]{0,3}(/[0-9]+)?$" ]]; then
+                    # ipv4
+                    if [ "${NET_TOOL}" == "1" ]; then
+                        # iptables
+                        # tcp
+                        `iptables -w -t nat -A ${v4} -p tcp -j REDIRECT -s ${ip} --to-ports ${redirectPort}`
+                        # udp
+                        `iptables -w -t mangle -A ${v4} -p udp -j TPROXY -s ${ip} --on-port ${tproxyPort} --tproxy-mark ${tproxyMark}`
+                    elif [ "${NET_TOOL}" == "2" ]; then
+                        # nft
+                        # tcp
+                        `nft add rule inet ${nftTableName} ssr-plus2-${ruleIndex}-tcp ip saddr ${ip} meta l4proto tcp counter redirect to :${redirectPort}`
+                        # udp
+                        if [ "${nftTProxyCount}" == "1" ]; then
+                            # 有模块
+                            `nft add rule inet ${nftTableName} ssr-plus2-${ruleIndex}-udp ip saddr ${ip} meta l4proto udp counter tproxy ip to :${tproxyPort} meta mark set ${tproxyMark}`
+                        fi
+                    fi
+                else
+                    # ipv6
+                    if [[ "${NET_TOOL}" == "1" && "${ip6tablesCount}" == "1" ]]; then
+                        # iptables
+                        # tcp
+                        `ip6tables -w -t nat -A ${v6} -p tcp -j REDIRECT -s ${ip} --to-ports ${redirectPort}`
+                        # udp
+                        `ip6tables -w -t mangle -A ${v6} -p udp -j TPROXY -s ${ip} --on-port ${tproxyPort} --tproxy-mark ${tproxyMark}`
+                    elif [ "${NET_TOOL}" == "2" ]; then
+                        # nft
+                        # tcp
+                        `nft add rule inet ${nftTableName} ssr-plus2-${ruleIndex}-tcp ip6 saddr ${ip} meta l4proto tcp counter redirect to :${redirectPort}`
+                        # udp
+                        if [ "${nftTProxyCount}" == "1" ]; then
+                            # 有模块
+                            `nft add rule inet ${nftTableName} ssr-plus2-${ruleIndex}-udp ip6 saddr ${ip} meta l4proto udp counter tproxy ip6 to :${tproxyPort} meta mark set ${tproxyMark}`
+                        fi
+                    fi
+                fi
+            done
+        done
+        
+
+
+
+        echolog "----------rule ${ruleIndex} proxyAddress start------------"
+
+
+        # 中间 变量
+        local tempAddress=""
+        # 代理地址列表
+        for address in ${proxyAddress}
+        do
+            # echo "address:${address}"
+            # 获取 地址
+            local url=$(uci_get_by_name ${address} address)
+            # echo "url:${url}"
+            # 获取 MD5
+            local md5=`echo -n "${url}" | md5sum | cut -d " " -f1`
+            
+            # echo "md5:${md5}"
+            
+            if [ ! -f "/etc/ssr-plus2/advance-address/${md5}" ]; then
+                echolog "----------rule ${ruleIndex} /etc/ssr-plus2/advance-address/${md5} do not exist------------"
+                continue
+            fi
+            
+            echolog "----------rule ${ruleIndex} /etc/ssr-plus2/advance-address/${md5}------------"
+            
+            # 保存
+            tempAddress="${tempAddress} /etc/ssr-plus2/advance-address/${md5}"
+            
+            
+            # while read line
+            # do
+            #     if [[ "${line}" =~ "^#" ]]; then
+            #         # 注释
+            #         continue
+            #     elif [[ "${line}" =~ "^[0-9]{0,3}\.[0-9]{0,3}\.[0-9]{0,3}\.[0-9]{0,3}(/[0-9]+)?$" ]]; then
+            #         # ipv4
+            #         # 添加 到 v4
+            #         # echo "ipset -! add ${v4} ${line}"
+            #         if [ "${NET_TOOL}" == "1" ]; then
+            #             # iptables
+            #             `ipset -! add ${v4} ${line} 2>/dev/null`
+            #         elif [ "${NET_TOOL}" == "2" ]; then
+            #             # nft
+            #             `nft add element inet ${nftTableName} ${v4} { ${line} } 2>/dev/null`
+            #         fi
+            #     elif [[ "${line}" =~ "^(http(s)?:\/\/)?[a-zA-Z0-9][-a-zA-Z0-9]{0,62}(\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+(:[0-9]{1,5})?$" ]]; then
+            #         # 域名
+            # 
+            #         # 输出 server
+            #         echo "server=/${line}/127.0.0.1#${dnsPort}" >> ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf
+            # 
+            #         if [ "${NET_TOOL}" == "1" ]; then
+            #             # iptables
+            #             # 输出 ipset
+            #             echo "ipset=/${line}/${v4},${v6}" >> ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf
+            #         elif [ "${NET_TOOL}" == "2" ]; then
+            #             # nft
+            #             # 输出 nftset
+            #             echo "nftset=/${line}/4#inet#${nftTableName}#${v4},6#inet#${nftTableName}#${v6}" >> ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf
+            #         fi
+            #     else
+            #         # 其他 默认为 ipv6
+            #         # 添加 到 v6
+            #         if [[ "${NET_TOOL}" == "1" && "${ip6tablesCount}" == "1" ]]; then
+            #             # iptables
+            #             # echo "ipset -! add ${v4} ${line}"
+            #             `ipset -! add ${v6} ${line} 2>/dev/null`                        
+            #         elif [ "${NET_TOOL}" == "2" ]; then
+            #             # nft
+            #             `nft add element inet ${nftTableName} ${v6} { ${line} }`
+            #         fi
+            #     fi
+            # done < /etc/ssr-plus2/advance-address/${md5}
+            
+            # 删除 域名 和 IPv6   剩下IPv4
+            # 因为 域名正则表达式 会匹配到 IPv4 此处使用IPv4匹配后取反操作(即删除除IPv4之外的所有)
+            for line in `sed "/^#/d; /^[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\(\/[0-9]+\)\?/!d" /etc/ssr-plus2/advance-address/${md5}`
+            do
+                # ipv4
+                # 添加 到 v4
+                # echo "ipset -! add ${v4} ${line}"
+                if [ "${NET_TOOL}" == "1" ]; then
+                    # iptables
+                    `ipset -! add ${v4} ${line} 2>/dev/null`
+                elif [ "${NET_TOOL}" == "2" ]; then
+                    # nft
+                    `nft add element inet ${nftTableName} ${v4} { ${line} } 2>/dev/null`
+                fi
+            done
+            
+            # 删除 IPv4 和 IPv6  剩下域名
+            # 因为 IPv6 正则 匹配 难写(有缩写情况) 
+            # 此处 先删除 IPv4 再删除域名之外的(取反操作) 剩下即为域名
+            for line in `sed "/^#/d; /^[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\(\/[0-9]+\)\?/d; /^\(http\(s\)\?:\/\/\)\?[a-zA-Z0-9][-a-zA-Z0-9]\{0,62\}\(\.[a-zA-Z0-9][-a-zA-Z0-9]\{0,62\}\)\+\(:[0-9]\{1,5\}\)\?/!d" /etc/ssr-plus2/advance-address/${md5}`
+            do
+                # 域名
+            
+                # 输出 server
+                echo "server=/${line}/127.0.0.1#${dnsPort}" >> ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf
+            
+                if [ "${NET_TOOL}" == "1" ]; then
+                    # iptables
+                    # 输出 ipset
+                    echo "ipset=/${line}/${v4},${v6}" >> ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf
+                elif [ "${NET_TOOL}" == "2" ]; then
+                    # nft
+                    # 输出 nftset
+                    echo "nftset=/${line}/4#inet#${nftTableName}#${v4},6#inet#${nftTableName}#${v6}" >> ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf
+                fi
+            done
+            
+            
+            # 删除 域名 和 IPv4  剩下IPv6
+            # 先删除 域名和IPv4 再删除有*的  再删除无:符号的
+            for line in `sed "/^#/d; /^\(http\(s\)\?:\/\/\)\?[a-zA-Z0-9][-a-zA-Z0-9]\{0,62\}\(\.[a-zA-Z0-9][-a-zA-Z0-9]\{0,62\}\)\+\(:[0-9]\{1,5\}\)\?/d; /.*\*.*/d; /.*\:.*/!d;" /etc/ssr-plus2/advance-address/${md5}`
+            do
+                # 添加 到 v6
+                if [[ "${NET_TOOL}" == "1" && "${ip6tablesCount}" == "1" ]]; then
+                    # iptables
+                    # echo "ipset -! add ${v4} ${line}"
+                    `ipset -! add ${v6} ${line} 2>/dev/null`                        
+                elif [ "${NET_TOOL}" == "2" ]; then
+                    # nft
+                    `nft add element inet ${nftTableName} ${v6} { ${line} }`
+                fi
+            done
+        done
+
+
+
+        # 代理节点列表
+        for tempNode in ${proxyNode}
+        do
+            # echo "node:${tempNode}"
+            # 获取 
+            local line=$(uci_get_by_name ${tempNode} server)
+            # echo "nodeServer:${line}"
+
+            if [[ "${line}" =~ "^#" ]]; then
+                # 注释
+                continue
+            elif [[ "${line}" =~ "^[0-9]{0,3}\.[0-9]{0,3}\.[0-9]{0,3}\.[0-9]{0,3}(/[0-9]+)?$" ]]; then
+                # ipv4
+                # 添加 到 v4
+                # echo "ipset -! add ${v4} ${line}"
+                if [ "${NET_TOOL}" == "1" ]; then
+                    # iptables
+                    `ipset -! add ${v4} ${line} 2>/dev/null`
+                elif [ "${NET_TOOL}" == "2" ]; then
+                    # nft
+                    `nft add element inet ${nftTableName} ${v4} { ${line} } 2>/dev/null`
+                fi
+            elif [[ "${line}" =~ "^(http(s)?:\/\/)?[a-zA-Z0-9][-a-zA-Z0-9]{0,62}(\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+(:[0-9]{1,5})?$" ]]; then
+                # 域名
+
+                # 输出 server
+                echo "server=/${line}/127.0.0.1#${dnsPort}" >> ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf
+            
+                if [ "${NET_TOOL}" == "1" ]; then
+                    # iptables
+                    # 输出 ipset
+                    echo "ipset=/${line}/${v4},${v6}" >> ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf
+                elif [ "${NET_TOOL}" == "2" ]; then
+                    # nft
+                    # 输出 nftset
+                    echo "nftset=/${line}/4#inet#${nftTableName}#${v4},6#inet#${nftTableName}#${v6}" >> ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf
+                fi
+            else
+                # 其他 默认为 ipv6
+                # 添加 到 v6
+                if [[ "${NET_TOOL}" == "1" && "${ip6tablesCount}" == "1" ]]; then
+                    # iptables
+                    # echo "ipset -! add ${v4} ${line}"
+                    `ipset -! add ${v6} ${line} 2>/dev/null`                        
+                elif [ "${NET_TOOL}" == "2" ]; then
+                    # nft
+                    `nft add element inet ${nftTableName} ${v6} { ${line} }`
+                fi
+            fi
+            
+            echolog "----------rule ${ruleIndex} 代理节点 必须开启路由本身代理------------"
+            # 代理了节点 需要路由器本身开启
+            ROUTER_PROXY="1"
+        done
+
+
+        echolog "----------rule ${ruleIndex} white start------------"
+
+
+        # 跳过代理地址
+        if [ -f "${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf" ]; then
+            # 存在 文件
+            if [ -f "/etc/ssr-plus2/global-white-domain" ]; then
+                # 文件存在
+                # 全局 跳过
+                while read line
+                do
+                    # 删除操作
+                    `sed -i "/${line}/d" ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf`
+                done < /etc/ssr-plus2/global-white-domain
+            fi
+
+            
+            # 节点 跳过
+            for skip in ${pass}
+            do
+                # 删除操作
+                `sed -i "/${skip}/d" ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf`
+            done
+
+
+            echolog "----------rule ${ruleIndex} delete already exist start------------"
+
+
+            # 删除 前面 已代理的域名
+            # 域名
+            if [ -f "${ADDRESS_FILE}" ]; then
+                # 文件存在
+                while read addressUrl
+                do
+                    # 输出
+                    # echo "${addressUrl}"
+                    # while read line
+                    # do
+                    #     # echo "${line}"
+                    #     if [[ "${line}" =~ "^(http(s)?:\/\/)?[a-zA-Z0-9][-a-zA-Z0-9]{0,62}(\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+(:[0-9]{1,5})?$" ]]; then
+                    #         # 域名
+                    #         # 删除操作
+                    #         `sed -i "/^${line}$/d" ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf`
+                    #     fi
+                    # done < ${addressUrl}
+                    # 先删除 IPv4 再删除不是域名的
+                    for line in `sed "/^#/d; /^[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\(\/[0-9]+\)\?/d; /^[a-zA-Z0-9][-a-zA-Z0-9]\{0,62\}\(\.[a-zA-Z0-9][-a-zA-Z0-9]\{0,62\}\)\+\(:[0-9]\{1,5\}\)\?/!d" ${addressUrl}`
+                    do
+                        # 域名
+                        # 删除操作
+                        `sed -i "/^${line}$/d" ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf`
+                    done
+                done < ${ADDRESS_FILE}
+            fi
+
+
+            echolog "----------rule ${ruleIndex} delete already force start------------"
+
+            
+            # 强制代理的列表
+            if [ -f "${FORCE_FILE}" ]; then
+                # 文件存在
+                # while read line
+                # do
+                #     # 删除操作
+                #     `sed -i "/^${line}$/d" ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf`
+                # done < ${FORCE_FILE}
+                
+                # 删除操作
+                `sed -i -f ${FORCE_FILE} ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf`
+            fi
+        fi
+
+        
+        # echo "tempAddress:${tempAddress}"
+        # 等 上面方法 删除 再保存
+        for line in ${tempAddress}
+        do
+            
+            echo "${line}" >> ${ADDRESS_FILE}
+        done
+
+
+
+        echolog "----------rule ${ruleIndex} force start------------"
+
+
+        # 强制代理地址
+        for line in ${force}
+        do
+            if [[ "${line}" =~ "^[0-9]{0,3}\.[0-9]{0,3}\.[0-9]{0,3}\.[0-9]{0,3}(/[0-9]+)?$" ]]; then
+                # ipv4
+                # 添加 到 v4
+
+                if [ "${NET_TOOL}" == "1" ]; then
+                    # iptables
+                    # echo "ipset -! add ${v4} ${line}"
+                    `ipset -! add ${v4} ${line} 2>/dev/null`
+                elif [ "${NET_TOOL}" == "2" ]; then
+                    # nft
+                    `nft add element inet ${nftTableName} ${v4} { ${line} } 2>/dev/null`
+                fi
+            elif [[ "${line}" =~ "^(http(s)?:\/\/)?[a-zA-Z0-9][-a-zA-Z0-9]{0,62}(\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+(:[0-9]{1,5})?$" ]]; then
+                # 域名
+                # 输出 server
+                echo "server=/${line}/127.0.0.1#${dnsPort}" >> ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf
+
+                if [ "${NET_TOOL}" == "1" ]; then
+                    # iptables
+                    # 输出 ipset
+                    echo "ipset=/${line}/${v4},${v6}" >> ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf
+                elif [ "${NET_TOOL}" == "2" ]; then
+                    # nft
+                    # 输出 nftset
+                    echo "nftset=/${line}/4#inet#${nftTableName}#${v4},6#inet#${nftTableName}#${v6}" >> ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf
+                fi
+
+                # 保存 保存为 sed 格式 使用 sed -f 删除
+                echo "/^${line}$/d" >> ${FORCE_FILE}
+            elif [[ "${line}" =~ "^[a-zA-Z0-9]{1,62}$" ]]; then
+                # 域名 只有数字和字母 也认为是域名
+                # 输出 server
+                echo "server=/${line}/127.0.0.1#${dnsPort}" >> ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf
+
+                if [ "${NET_TOOL}" == "1" ]; then
+                    # iptables
+                    # 输出 ipset
+                    echo "ipset=/${line}/${v4},${v6}" >> ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf
+                elif [ "${NET_TOOL}" == "2" ]; then
+                    # nft
+                    # 输出 nftset
+                    echo "nftset=/${line}/4#inet#${nftTableName}#${v4},6#inet#${nftTableName}#${v6}" >> ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf
+                fi
+
+                # 保存 保存为 sed 格式 使用 sed -f 删除
+                echo "/^${line}$/d" >> ${FORCE_FILE}
+            else
+                # 其他 默认为 ipv6
+                # 添加 到 v6
+                if [[ "${NET_TOOL}" == "1" && "${ip6tablesCount}" == "1" ]]; then
+                    # iptables
+                    # echo "ipset -! add ${v4} ${line}"
+                    `ipset -! add ${v6} ${line} 2>/dev/null`
+                elif [ "${NET_TOOL}" == "2" ]; then
+                    # nft
+                    `nft add element inet ${nftTableName} ${v6} { ${line} } 2>/dev/null`
+                fi
+            fi
+        done
+
+
+        echolog "----------rule ${ruleIndex} add firewall start------------"
+
+
+        # 代理规则
+
+        if [ "${NET_TOOL}" == "1" ]; then
+            # iptables
+            # 代理端口 语法
+            local proxyPortGrammar
+
+            if [ "${proxyPort}" == "" ]; then
+                # 没有指定 端口
+                proxyPortGrammar=""
+            else
+                # 指定端口
+                proxyPortGrammar="-m multiport --dports ${proxyPort}"
+            fi
+            
+            # tcp
+            `iptables -w -t nat -A ${v4} -p tcp -j REDIRECT ${proxyPortGrammar} -m set --match-set ${v4} dst --to-ports ${redirectPort}`
+            # udp
+            `iptables -w -t mangle -A ${v4} -p udp -j TPROXY ${proxyPortGrammar} -m set --match-set ${v4} dst --on-port ${tproxyPort} --tproxy-mark ${tproxyMark}`
+            
+            if [ "${ip6tablesCount}" == "1" ]; then
+                # tcp
+                `ip6tables -w -t nat -A ${v6} -p tcp -j REDIRECT ${proxyPortGrammar} -m set --match-set ${v6} dst --to-ports ${redirectPort}`
+                # udp
+                `ip6tables -w -t mangle -A ${v6} -p udp -j TPROXY ${proxyPortGrammar} -m set --match-set ${v6} dst --on-port ${tproxyPort} --tproxy-mark ${tproxyMark}`
+            fi
+        elif [ "${NET_TOOL}" == "2" ]; then
+            # nft
+            # 代理规则
+            if [ "${proxyPort}" == "" ]; then
+                # 没有指定 端口
+                # tcp
+                `nft add rule inet ${nftTableName} ssr-plus2-${ruleIndex}-tcp meta l4proto tcp ip  daddr @${v4} counter redirect to :${redirectPort}`
+                `nft add rule inet ${nftTableName} ssr-plus2-${ruleIndex}-tcp meta l4proto tcp ip6 daddr @${v6} counter redirect to :${redirectPort}`
+                # udp
+                if [ "${nftTProxyCount}" == "1" ]; then
+                    # 有模块
+                    `nft add rule inet ${nftTableName} ssr-plus2-${ruleIndex}-udp meta l4proto udp ip  daddr @${v4} counter tproxy ip  to :${tproxyPort} meta mark set ${tproxyMark}`
+                    `nft add rule inet ${nftTableName} ssr-plus2-${ruleIndex}-udp meta l4proto udp ip6 daddr @${v6} counter tproxy ip6 to :${tproxyPort} meta mark set ${tproxyMark}`
+                fi
+            else
+                # 指定端口
+                # tcp
+                `nft add rule inet ${nftTableName} ssr-plus2-${ruleIndex}-tcp meta l4proto tcp tcp dport { ${proxyPort} } ip  daddr @${v4} counter redirect to :${redirectPort}`
+                `nft add rule inet ${nftTableName} ssr-plus2-${ruleIndex}-tcp meta l4proto tcp tcp dport { ${proxyPort} } ip6 daddr @${v6} counter redirect to :${redirectPort}`
+                # udp
+                if [ "${nftTProxyCount}" == "1" ]; then
+                    # 有模块
+                    `nft add rule inet ${nftTableName} ssr-plus2-${ruleIndex}-udp meta l4proto udp udp dport { ${proxyPort} } ip  daddr @${v4} counter tproxy ip  to :${tproxyPort} meta mark set ${tproxyMark}`
+                    `nft add rule inet ${nftTableName} ssr-plus2-${ruleIndex}-udp meta l4proto udp udp dport { ${proxyPort} } ip6 daddr @${v6} counter tproxy ip6 to :${tproxyPort} meta mark set ${tproxyMark}`
+                fi
+            fi
+        fi
+
+
+        # +1
+        ruleIndex=$((ruleIndex+1))
+    done
+    
+
+    echolog "----------rule end------------"
+
+
+    if [ "${runRuleIndex}" == "" ]; then
+        # 输出日志
+        echolog "----------no rule enable------------"
+        echolog "----------end------------"
+        # 解锁
+        unset_lock
+        return
+    fi
+
+
+    echolog "----------global start------------"
+
+    # 添加 透明代理 路由
+    `ip rule add fwmark ${tproxyMark} table 100`
+    `ip route add local 0.0.0.0/0 dev lo table 100`
+
+    if [ "${NET_TOOL}" == "1" ]; then
+        # iptables
+
+        # ipv4
+        local globalV4="ssr-plus2-global-v4"
+        # ipv6
+        local globalV6="ssr-plus2-global-v6"
+
+        # 创建 全局代理
+        # ipv4
+        # tcp
+        `iptables -w -t nat -N ${globalV4}`
+
+        # dns 解析
+        # `iptables -w -t nat -I ${globalV4} -p tcp -j RETURN -m comment --comment 'DNS放行' --dport 53 -d 127.0.0.0/8`
+        # 忽略 以下目标IP
+        `iptables -w -t nat -A ${globalV4} -p tcp -j RETURN -m comment --comment '局域网放行' -d 0.0.0.0/8`
+        `iptables -w -t nat -A ${globalV4} -p tcp -j RETURN -m comment --comment '局域网放行' -d 10.0.0.0/8`
+        `iptables -w -t nat -A ${globalV4} -p tcp -j RETURN -m comment --comment '局域网放行' -d 127.0.0.0/8`
+        `iptables -w -t nat -A ${globalV4} -p tcp -j RETURN -m comment --comment '局域网放行' -d 169.254.0.0/16`
+        `iptables -w -t nat -A ${globalV4} -p tcp -j RETURN -m comment --comment '局域网放行' -d 172.16.0.0/12`
+        `iptables -w -t nat -A ${globalV4} -p tcp -j RETURN -m comment --comment '局域网放行' -d 192.168.0.0/16`
+        `iptables -w -t nat -A ${globalV4} -p tcp -j RETURN -m comment --comment '局域网放行' -d 224.0.0.0/4`
+        `iptables -w -t nat -A ${globalV4} -p tcp -j RETURN -m comment --comment '局域网放行' -d 240.0.0.0/4`
+        
+        # udp
+        `iptables -w -t mangle -N ${globalV4}`
+
+        # dns 解析
+        # `iptables -w -t mangle -I ${globalV4} -p udp -j RETURN -m comment --comment 'DNS放行' --dport 53 -d 127.0.0.0/8`
+        # 忽略 以下目标IP
+        `iptables -w -t mangle -A ${globalV4} -p udp -j RETURN -m comment --comment '局域网放行' -d 0.0.0.0/8`
+        `iptables -w -t mangle -A ${globalV4} -p udp -j RETURN -m comment --comment '局域网放行' -d 10.0.0.0/8`
+        `iptables -w -t mangle -A ${globalV4} -p udp -j RETURN -m comment --comment '局域网放行' -d 127.0.0.0/8`
+        `iptables -w -t mangle -A ${globalV4} -p udp -j RETURN -m comment --comment '局域网放行' -d 169.254.0.0/16`
+        `iptables -w -t mangle -A ${globalV4} -p udp -j RETURN -m comment --comment '局域网放行' -d 172.16.0.0/12`
+        `iptables -w -t mangle -A ${globalV4} -p udp -j RETURN -m comment --comment '局域网放行' -d 192.168.0.0/16`
+        `iptables -w -t mangle -A ${globalV4} -p udp -j RETURN -m comment --comment '局域网放行' -d 224.0.0.0/4`
+        `iptables -w -t mangle -A ${globalV4} -p udp -j RETURN -m comment --comment '局域网放行' -d 240.0.0.0/4`
+
+
+
+        if [ "${ip6tablesCount}" == "1" ]; then
+            # ipv6
+            # tcp
+            `ip6tables -w -t nat -N ${globalV6}`
+
+            # dns 解析
+            # `ip6tables -w -t nat -I ${globalV6} -p tcp -j RETURN -m comment --comment 'DNS放行' --dport 53 -d ::1/128`
+
+            # 忽略 以下目标IP
+            #ip6tables -t nat -A ${globalV6} -p tcp -j RETURN -m comment --comment '局域网放行' -d ::/0`
+            `ip6tables -w -t nat -A ${globalV6} -p tcp -j RETURN -m comment --comment '局域网放行' -d ::1/128`
+            `ip6tables -w -t nat -A ${globalV6} -p tcp -j RETURN -m comment --comment '局域网放行' -d fc00::/7`
+            `ip6tables -w -t nat -A ${globalV6} -p tcp -j RETURN -m comment --comment '局域网放行' -d ff00::/8`
+            `ip6tables -w -t nat -A ${globalV6} -p tcp -j RETURN -m comment --comment '局域网放行' -d fe80::/10`
+
+
+            # udp
+            `ip6tables -w -t mangle -N ${globalV6}`
+
+            # dns 解析
+            # `ip6tables -w -t mangle -I ${globalV6} -p udp -j RETURN -m comment --comment 'DNS放行' --dport 53 -d ::1/128`
+
+            # 忽略 以下目标IP
+            #ip6tables -t mangle -A ${globalV6} -p udp -j RETURN -m comment --comment '局域网放行' -d ::/0`
+            `ip6tables -w -t mangle -A ${globalV6} -p udp -j RETURN -m comment --comment '局域网放行' -d ::1/128`
+            `ip6tables -w -t mangle -A ${globalV6} -p udp -j RETURN -m comment --comment '局域网放行' -d fc00::/7`
+            `ip6tables -w -t mangle -A ${globalV6} -p udp -j RETURN -m comment --comment '局域网放行' -d ff00::/8`
+            `ip6tables -w -t mangle -A ${globalV6} -p udp -j RETURN -m comment --comment '局域网放行' -d fe80::/10`
+        fi
+
+
+
+        for i in ${runRuleIndex}
+        do
+            # echo "当前值: $i"
+            
+            # ipv4
+            # tcp
+            `iptables -w -t nat -A ${globalV4} -p tcp -j ssr-plus2-${i}-v4`
+            # udp
+            `iptables -w -t mangle -A ${globalV4} -p udp -j ssr-plus2-${i}-v4`
+
+            if [ "${ip6tablesCount}" == "1" ]; then
+                # ipv6
+                # tcp
+                `ip6tables -w -t nat -A ${globalV6} -p tcp -j ssr-plus2-${i}-v6`
+                # udp
+                `ip6tables -w -t mangle -A ${globalV6} -p udp -j ssr-plus2-${i}-v6`
+            fi
+            
+            # +1
+            i=$((i+1))
+        done
+
+   
+        # local IFNAME=$(uci -P /var/state get network.lan.ifname 2>/dev/null)
+        # [ -z "$IFNAME" ] && IFNAME=$(uci -P /var/state get network.lan.device 2>/dev/null)
+        
+
+        # 默认规则
+        # tcp
+        `iptables -w -t nat -A ${globalV4} -p tcp -j RETURN -m comment --comment '默认规则'`
+
+        # 将 PREROUTING 转发到 代理链
+        # `iptables -w -t nat -I PREROUTING -p tcp -j ${globalV4} -i ${IFNAME}`
+        `iptables -w -t nat -I PREROUTING -p tcp -j ${globalV4}`
+        
+        if [ "${ROUTER_PROXY}" == "1" ]; then
+            # 将 OUTPUT 转发到 全局 代理链 解决路由器本身访问代理
+            `iptables -w -t nat -I OUTPUT -p tcp -j ${globalV4}`
+        fi
+
+
+
+        # udp
+        `iptables -w -t mangle -A ${globalV4} -p udp -j RETURN -m comment --comment '默认规则'`
+
+        # 将 PREROUTING 转发到 代理链
+        # `iptables -w -t mangle -I PREROUTING -p udp -j ${globalV4} -i ${IFNAME}`
+        `iptables -w -t mangle -I PREROUTING -p udp -j ${globalV4}`
+
+
+
+        if [ "${ip6tablesCount}" == "1" ]; then
+            # tcp
+            `ip6tables -w -t nat -A ${globalV6} -p tcp -j RETURN -m comment --comment '默认规则'`
+
+            # 将 PREROUTING 转发到 代理链
+            # `ip6tables -w -t nat -I PREROUTING -p tcp -j ${globalV6} -i ${IFNAME}`
+            `ip6tables -w -t nat -I PREROUTING -p tcp -j ${globalV6}`
+            
+            if [ "${ROUTER_PROXY}" == "1" ]; then
+                # 将 OUTPUT 转发到 全局 代理链 解决路由器本身访问代理
+                `ip6tables -w -t nat -I OUTPUT -p tcp -j ${globalV6}`            
+            fi
+            
+            
+            # udp
+            `ip6tables -w -t mangle -A ${globalV6} -p udp -j RETURN -m comment --comment '默认规则'`
+
+            # 将 PREROUTING 转发到 代理链
+            # `ip6tables -w -t mangle -I PREROUTING -p udp -j ${globalV6} -i ${IFNAME}`
+            `ip6tables -w -t mangle -I PREROUTING -p udp -j ${globalV6}`
+        fi
+    elif [ "${NET_TOOL}" == "2" ]; then
+        # nft
+        
+        # 添加 全局链
+        # tcp
+        # 代理进入流量
+        `nft add chain inet ${nftTableName} prerouting-tcp { type nat hook prerouting priority 0 \\; policy accept \\; }`
+
+        if [ "${ROUTER_PROXY}" == "1" ]; then
+            # 解决路由器本身访问代理
+            `nft add chain inet ${nftTableName} output-tcp { type nat hook output priority 0 \\; policy accept \\; }`
+        fi
+
+
+
+        # 添加忽略规则
+        
+        `nft add rule inet ${nftTableName} prerouting-tcp ip daddr 0.0.0.0/8 return`
+        `nft add rule inet ${nftTableName} prerouting-tcp ip daddr 10.0.0.0/8 return`
+        `nft add rule inet ${nftTableName} prerouting-tcp ip daddr 127.0.0.0/8 return`
+        `nft add rule inet ${nftTableName} prerouting-tcp ip daddr 169.254.0.0/16 return`
+        `nft add rule inet ${nftTableName} prerouting-tcp ip daddr 172.16.0.0/12 return`
+        `nft add rule inet ${nftTableName} prerouting-tcp ip daddr 192.168.0.0/16 return`
+        `nft add rule inet ${nftTableName} prerouting-tcp ip daddr 224.0.0.0/4 return`
+        `nft add rule inet ${nftTableName} prerouting-tcp ip daddr 240.0.0.0/4 return`
+
+
+        `nft add rule inet ${nftTableName} prerouting-tcp ip6 daddr ::1/128 return`
+        `nft add rule inet ${nftTableName} prerouting-tcp ip6 daddr fc00::/7 return`
+        `nft add rule inet ${nftTableName} prerouting-tcp ip6 daddr ff00::/8 return`
+        `nft add rule inet ${nftTableName} prerouting-tcp ip6 daddr fe80::/10 return`
+
+
+        if [ "${ROUTER_PROXY}" == "1" ]; then
+            `nft add rule inet ${nftTableName} output-tcp ip daddr 0.0.0.0/8 return`
+            `nft add rule inet ${nftTableName} output-tcp ip daddr 10.0.0.0/8 return`
+            `nft add rule inet ${nftTableName} output-tcp ip daddr 127.0.0.0/8 return`
+            `nft add rule inet ${nftTableName} output-tcp ip daddr 169.254.0.0/16 return`
+            `nft add rule inet ${nftTableName} output-tcp ip daddr 172.16.0.0/12 return`
+            `nft add rule inet ${nftTableName} output-tcp ip daddr 192.168.0.0/16 return`
+            `nft add rule inet ${nftTableName} output-tcp ip daddr 224.0.0.0/4 return`
+            `nft add rule inet ${nftTableName} output-tcp ip daddr 240.0.0.0/4 return`
+
+
+            `nft add rule inet ${nftTableName} output-tcp ip6 daddr ::1/128 return`
+            `nft add rule inet ${nftTableName} output-tcp ip6 daddr fc00::/7 return`
+            `nft add rule inet ${nftTableName} output-tcp ip6 daddr ff00::/8 return`
+            `nft add rule inet ${nftTableName} output-tcp ip6 daddr fe80::/10 return`        
+        fi
+
+
+
+        # udp
+        if [ "${nftTProxyCount}" == "1" ]; then
+            # 有模块
+            # 代理进入流量
+            `nft add chain inet ${nftTableName} prerouting-udp {  type filter hook prerouting priority mangle \\; policy accept \\; }`
+
+
+            # 添加忽略规则
+            
+            `nft add rule inet ${nftTableName} prerouting-udp ip daddr 0.0.0.0/8 return`
+            `nft add rule inet ${nftTableName} prerouting-udp ip daddr 10.0.0.0/8 return`
+            `nft add rule inet ${nftTableName} prerouting-udp ip daddr 127.0.0.0/8 return`
+            `nft add rule inet ${nftTableName} prerouting-udp ip daddr 169.254.0.0/16 return`
+            `nft add rule inet ${nftTableName} prerouting-udp ip daddr 172.16.0.0/12 return`
+            `nft add rule inet ${nftTableName} prerouting-udp ip daddr 192.168.0.0/16 return`
+            `nft add rule inet ${nftTableName} prerouting-udp ip daddr 224.0.0.0/4 return`
+            `nft add rule inet ${nftTableName} prerouting-udp ip daddr 240.0.0.0/4 return`
+
+
+            `nft add rule inet ${nftTableName} prerouting-udp ip6 daddr ::1/128 return`
+            `nft add rule inet ${nftTableName} prerouting-udp ip6 daddr fc00::/7 return`
+            `nft add rule inet ${nftTableName} prerouting-udp ip6 daddr ff00::/8 return`
+            `nft add rule inet ${nftTableName} prerouting-udp ip6 daddr fe80::/10 return`
+        fi
+
+
+
+        # 将 节点代理链 添加到 全局链
+        for i in ${runRuleIndex}
+        do
+            # echo "当前值: $i"
+            # tcp
+            `nft add rule inet ${nftTableName} prerouting-tcp meta l4proto tcp counter jump ssr-plus2-${i}-tcp`
+            
+            if [ "${ROUTER_PROXY}" == "1" ]; then
+                `nft add rule inet ${nftTableName} output-tcp meta l4proto tcp counter jump ssr-plus2-${i}-tcp`
+            fi
+            
+            
+            # udp
+            if [ "${nftTProxyCount}" == "1" ]; then
+                # 有模块
+                `nft add rule inet ${nftTableName} prerouting-udp meta l4proto udp counter jump ssr-plus2-${i}-udp`
+            fi
+            
+            
+            # +1
+            i=$((i+1))
+        done
+    fi
+
+
+
+    echolog "----------dnsmasq start------------"
+
+    # 重启 dnsmasq
+    /etc/init.d/dnsmasq restart >/dev/null 2>&1
+
+
+    # 输出日志
+    echolog "----------end------------"
+    # 解锁
+    unset_lock
+}
+
+
+# 删除 ssr-plus2-global 引用
+function deleteGlobal() { # iptables/ip6tables table 名称
+    local IFNAME=$(uci -P /var/state get network.lan.ifname 2>/dev/null)
+    [ -z "$IFNAME" ] && IFNAME=$(uci -P /var/state get network.lan.device 2>/dev/null)
+
+
+    # 删除  引用
+    local result=`$1 -w -t $2 -L -n --line-number`
+    #echo "${result}"
+
+    # 备份旧的IFS变量
+    local OLDIFS="$IFS"
+    # 修改分隔符为换行符 
+    IFS=$'\n'
+    
+    # 链名
+    local chainName
+    # 上一个 链名
+    local preChainName=""
+    # 删除次数
+    local deleteCount=0
+    for line in ${result}
+    do
+        if [[ ${line} =~ "^Chain.*" ]]; then
+            # 获取 链名
+            chainName=`echo -n "${line}" | awk '{print \$2}'`
+            # 输出
+            # echo "chainName:${chainName}"
+        elif [[ ${line} =~ "^[1-9]+.*$3.*" ]]; then
+            # 以 数字开头
+
+            # 取出 行号
+            local lineNumber=`echo -n "${line}" | awk '{print \$1}'`
+            # 输出
+            # echo "chainName:${chainName}"
+            # echo "${lineNumber}"
+
+            local useLineNumber
+            if [ "${preChainName}" != "${chainName}" ]; then
+                # 第一次删除 或者 下一个链 直接使用获取的 lineNumber
+                # echo "不同"
+                useLineNumber=${lineNumber}
+                deleteCount=0
+            else
+                # 否则 因为上一个删除 lineNumber - deleteCount
+                # echo "相同"
+                useLineNumber=$((lineNumber-deleteCount))
+            fi
+            # echo "${useLineNumber}"
+
+           
+            # echo "$1 -t nat -D ${chainName} ${useLineNumber}"
+            `$1 -w -t nat -D ${chainName} ${useLineNumber}`
+ 
+            # 保存
+            preChainName=${chainName}
+            # 删除次数 + deleteCount
+            deleteCount=$((deleteCount+1))
+        fi
+    done
+
+
+    # 还原IFS变量
+    IFS="$OLDIFS"
+}
+
+
+function cleanIptables() {
+    # ipv4
+    for chainName in `iptables -t nat -L -n | grep "$1" | awk '{print \$2}'`
+    do
+        # echo "chainName:${chainName}"
+        # 先 清空
+        `iptables -w -t nat -F ${chainName}`
+        # 再 删除
+        `iptables -w -t nat -X ${chainName}`
+    done
+
+    for chainName in `iptables -t mangle -L -n | grep "$1" | awk '{print \$2}'`
+    do
+        # echo "chainName:${chainName}"
+        # 先 清空
+        `iptables -w -t mangle -F ${chainName}`
+        # 再 删除
+        `iptables -w -t mangle -X ${chainName}`
+    done
+
+    if [ "${ip6tablesCount}" == "1" ]; then
+        # ipv6
+        for chainName in `ip6tables -t nat -L -n | grep "$1" | awk '{print $2}'`
+        do
+            # echo "chainName:${chainName}"
+            # 先 清空
+            `ip6tables -w -t nat -F ${chainName}`
+            # 再 删除
+            `ip6tables -w -t nat -X ${chainName}`
+        done
+
+        for chainName in `ip6tables -t mangle -L -n | grep "$1" | awk '{print $2}'`
+        do
+            # echo "chainName:${chainName}"
+            # 先 清空
+            `ip6tables -w -t mangle -F ${chainName}`
+            # 再 删除
+            `ip6tables -w -t mangle -X ${chainName}`
+        done
+    fi
+}
+
+
+# 关闭
+stop() {
+    # 等待解锁
+    unlock
+    # 设置锁
+    set_lock
+    
+    # 输出日志
+    echolog "----------stop------------"
+    
+    # 删除 透明代理 路由
+    `ip rule del fwmark ${tproxyMark} table 100 2>/dev/null`
+    `ip route del local 0.0.0.0/0 dev lo table 100 2>/dev/null`
+    
+    
+    if [ -f "${PID_FILE}" ]; then
+        # 关闭 进程
+        for line in $(cat ${PID_FILE}); do kill ${line} 2>/dev/null; done
+
+        # 休息 1秒
+        sleep 1
+    fi
+
+    echolog "----------delete temp path------------"
+    
+    # 删除 文件 以及 目录
+    rm -rf ${TEMP_PATH}
+    
+    
+    if [ "${iptablesCount}" == "1" ]; then
+        # iptables
+
+        echolog "----------delete iptables reference------------"
+
+        # 删除 ssr-plus2-global 引用
+        ## deleteGlobal 'iptables' 'nat' 'ssr-plus2-global'
+        ## deleteGlobal 'ip6tables' 'nat' 'ssr-plus2-global'
+        # 没有 -i 参数 可直接删除
+        # tcp
+        `iptables  -w -t nat -D PREROUTING -p tcp -j ssr-plus2-global-v4 2>/dev/null`
+        `iptables  -w -t nat -D OUTPUT -p tcp -j ssr-plus2-global-v4 2>/dev/null`
+        # udp
+        `iptables  -w -t mangle -D PREROUTING -p udp -j ssr-plus2-global-v4 2>/dev/null`
+        `iptables  -w -t mangle -D OUTPUT -p udp -j ssr-plus2-global-v4 2>/dev/null`
+
+
+        if [ "${ip6tablesCount}" == "1" ]; then
+            # tcp
+            `ip6tables -w -t nat -D PREROUTING -p tcp -j ssr-plus2-global-v6 2>/dev/null`
+            `ip6tables -w -t nat -D OUTPUT -p tcp -j ssr-plus2-global-v6 2>/dev/null`
+            # udp            
+            `ip6tables -w -t mangle -D PREROUTING -p udp -j ssr-plus2-global-v6 2>/dev/null`
+            `ip6tables -w -t mangle -D OUTPUT -p udp -j ssr-plus2-global-v6 2>/dev/null`
+        fi
+        
+        
+        echolog "----------clean iptables------------"
+        # 先删除 global
+        cleanIptables 'Chain ssr-plus2-global'
+        # 再删除 其他
+        cleanIptables 'Chain ssr-plus2'
+
+
+        echolog "----------clean ipset------------"
+        # 删除 ipset
+        for ipsetName in `ipset list | grep ssr-plus2 | awk '{print $2}'`
+        do
+            # echo "ipsetName:${ipsetName}"
+            `ipset destroy ${ipsetName}`
+        done
+    fi
+
+
+    if [ "${nftCount}" == "1" ]; then
+        # nft
+
+        echolog "----------delete nft------------"
+        `nft delete table inet ${nftTableName} 2>/dev/null`
+    fi
+
+    
+    echolog "----------clean dnsmasq------------"
+    # 
+    if [ -f "${DNSMASQ_CONF_DIR}/${DNSMASQ_CONFIG_NAME}" ]; then
+       # 有配置文件
+       # 删除 文件 以及 目录
+       rm -rf ${DNSMASQ_CONF_DIR}/${DNSMASQ_CONFIG_NAME} ${DNSMASQ_CONFIG_PATH}
+       
+       # 重启 dnsmasq
+       /etc/init.d/dnsmasq restart >/dev/null 2>&1
+    fi
+
+    # 输出日志
+    echolog "----------end------------"
+
+    # 解锁
+    unset_lock
+}
+
+
+# 系统启动
+boot() {
+    # 输出日志
+    echolog "boot！"
+    # 启动
+    start
+}
+
+
+# 状态
+status() {
+    if [ ! -f "${PID_FILE}" ]; then
+        # 文件不存在
+        # 未运行
+        echo "inactive"
+        return
+    fi
+
+
+    if [ -f "${LOCK_FILE}" ]; then
+        # 文件存在
+        # 启动中
+        echo "starting"
+        return
+    fi
+
+
+    # 获取 进程数量
+    local count=`cat ${PID_FILE} | wc -l`
+    
+    if [ "${count}" == "0" ]; then
+        # 未运行
+        echo "inactive"
+    else
+        # 运行中
+        echo "running"
+    fi
+}
+
+
+# 重置
+reset() {
+    # 先关闭
+    stop
+    # 设置锁
+    set_lock
+    # 删除文件
+    rm -rf /etc/config/ssr-plus2 ${LOG_FILE}
+    # 新建文件
+    touch /etc/config/ssr-plus2 ${LOG_FILE}
+    # 复制 默认配置文件
+    cp /usr/share/ssr-plus2/ssr-plus2.config /etc/config/${CONFIG_NAME}
+    # 解锁
+    unset_lock
+}
+
+
+# curl 下载 直接调用 curl 可能 返回数据不全就结束问题
+mycurl() {
+    # 获取传入参数 经过/etc/rc.common脚本处理 此处为 $1
+    local subscribeUrl=$1
+    local userAgent=$2
+
+    # 调用结果
+    local curlResut
+    # 调用
+    if [ -z "${userAgent}" ]; then
+        # echo "字符串为空"
+        curlResut=`sh /usr/share/ssr-plus2/curl.sh ${subscribeUrl}`
+    else
+        # echo "字符串非空"
+        curlResut=`sh /usr/share/ssr-plus2/curl.sh -sSL --connect-timeout 60 --max-time 180 --retry 3 --insecure --location "${subscribeUrl}" --user-agent "${userAgent}"`
+    fi
+
+    # 输出
+    echo "${curlResut}"
+}
+
+
+# 更新
+updateAdvancedAddress() {
+    # 高级设置 更新 所有列表
+    # 获取传入参数 经过/etc/rc.common脚本处理 此处为 $1
+    local cfgid=$1
+    # 执行脚本
+    updateResult=`echo "{\"cfgid\":\"${cfgid}\"}" | lua /usr/libexec/rpcd/luci.ssr-plus2 call updateAdvancedAddress`
+    # echo "========================="
+    # 返回结果
+    echo "${updateResult}"
+}
+
+
+# 执行 ls 命令
+list() {
+    # 列出文件
+    lsResult=`ls $1 2>/dev/null`
+    # echo "========================="
+    # 返回结果
+    echo "${lsResult}"
+}
+
+
+# 读取 文件 命令
+readLog() {
+    # 列出文件
+    readResult=`tail -n $2 $1 2>/dev/null`
+    # echo "========================="
+    # 返回结果
+    echo "${readResult}"
+}
+
+
+# 延迟 测试
+latency() {
+    # 列出文件
+    latencyResult=`sh /usr/share/ssr-plus2/latency.sh $@`
+    # echo "========================="
+    # 返回结果
+    echo "${latencyResult}"
+}

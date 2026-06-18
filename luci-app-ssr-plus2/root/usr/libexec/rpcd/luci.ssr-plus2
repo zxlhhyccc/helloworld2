@@ -1,0 +1,428 @@
+#!/usr/bin/env lua
+
+local uci  = require "luci.model.uci"
+local json = require "luci.jsonc"
+local fs   = require "nixio.fs"
+local util = require "luci.util"
+local sys  = require "luci.sys"
+
+
+-- uci
+local ucic = uci.cursor()
+-- 字符串去除空格
+string.trim = util.trim
+
+
+-- 包名
+local PACKAGE_NAME = 'ssr-plus2'
+-- 加载配置
+ucic:load(PACKAGE_NAME)
+
+
+-- 计算 md5 值
+local function md5_string(data)
+    -- 生成临时文件名
+    -- os.time 保证每秒唯一，但不足以避免全部冲突；math.random(1000,9999) 增加文件名唯一性，避免并发时冲突
+    local tmp = "/tmp/md5_tmp_" .. os.time() .. "_" .. math.random(1000,9999)
+     -- 写入临时文件
+    fs.writefile(tmp, data)
+    
+    -- 执行 md5sum 命令
+    local md5 = sys.exec(string.format('md5sum "%s" 2>/dev/null | cut -d " " -f1', tmp)):gsub("%s+", "")
+    
+     -- 删除临时文件
+    nixio.fs.remove(tmp)
+
+    -- 返回 md5值
+    return md5
+end
+
+-- base64 解码
+local bc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+local function base64Decode(data)
+    data = string.gsub(data, '[^' .. bc .. '=]', '')
+    return (data:gsub('.', function(x)
+        if (x == '=') then
+            return ''
+        end
+        local r, f = '', (bc:find(x) - 1)
+        for i = 6, 1, -1 do
+            r = r .. (f % 2 ^ i - f % 2 ^ (i - 1) > 0 and '1' or '0')
+        end
+        return r;
+    end):gsub('%d%d%d?%d?%d?%d?%d?%d?', function(x)
+        if (#x ~= 8) then
+            return ''
+        end
+        local c = 0
+        for i = 1, 8 do
+            c = c + (x:sub(i, i) == '1' and 2 ^ (8 - i) or 0)
+        end
+        return string.char(c)
+    end))
+end
+
+-- 是否 base64 数据
+local function is_valid_base64(data)
+    -- 去除换行
+    local tempText = string.gsub(data, '\n', '')
+    -- 判断
+    return #tempText % 4 == 0 and tempText:match("^[A-Za-z0-9+/=]+$")
+end
+
+-- base64 解码(判断是否需要解码)
+local function base64DecodeIfNeed(text)
+    local raw = text
+    if not text then
+        return ''
+    end
+
+
+    if is_valid_base64(text) then
+        -- base64 编码数据
+        local result = base64Decode(text)
+        if result then
+            return result:gsub("%z", "")
+        else
+            return raw
+        end
+    else
+        -- 非 base64 编码数据
+        return raw
+    end
+end
+
+-- curl
+local function curl(url)
+    -- 清理 URL 中的隐藏字符
+    url = url:gsub("%s+$", ""):gsub("^%s+", ""):gsub("%z", "")
+
+    -- 构建curl命令（确保 user_agent 为空时不添加 -A 参数）
+    local cmd = string.format(
+        'sh /usr/share/ssr-plus2/curl.sh "%s"',
+        url:gsub('["$`\\]', '\\%0')  -- 安全转义
+    )
+    
+    -- 执行
+    local stdout = sys.exec(cmd)
+    -- 去除空格
+    stdout = util.trim(stdout)
+
+    -- 计算 md5
+    local md5 = md5_string(stdout)
+    -- 返回
+    return stdout, md5
+end
+
+
+-- 自定义函数
+function table.contains(t, val)
+    for _, v in ipairs(t) do
+        if v == val then
+            return true
+        end
+    end
+    return false
+end
+
+local methods = {
+    updateAdvancedAddress = {
+        -- 参数说明
+        args = {cfgid = "a_string"},
+        
+        -- 实际方法    
+        call = function(args)
+            -- 打印 参数
+            -- print(json.stringify(args))
+            -- 取出参数
+            local cfgid = args.cfgid
+            
+            -- 文件路径
+            local savePath = '/etc/ssr-plus2/advance-address/'
+
+
+            -- 新建文件夹 防止文件夹不存在
+            fs.mkdirr(savePath)
+            
+            -- 更新的文件名称
+            local updateFileName = {}
+            -- 结果
+            local updateResult = {}
+            
+            
+            -- 不为空
+            local isNotEmpty = string.len(cfgid) ~= 0
+                
+            
+            -- 获取 所有域名列表
+            ucic:foreach(PACKAGE_NAME, "advanced_address", function(section)
+                -- name
+                local name = section['.name']
+                -- 别名
+                local alias = section['alias']
+                -- 地址
+                local address = section['address']
+                -- 地址 MD5
+                local md5String = md5_string(address)
+                -- 状态
+                local status
+                -- 描述
+                local message
+
+
+                if isNotEmpty and cfgid ~= name then
+                    -- 不为空 且 不是指定的
+                    -- 继续下一个
+                    return
+                end
+                
+                
+                
+                -- 调用 curl
+                local raw, new_md5 = curl(address)
+                
+                
+                -- 文件名称
+                local saveFile = savePath .. md5String
+                
+                -- 保存
+                table.insert(updateFileName, md5String)
+                
+                
+                
+                if #raw > 0 then
+                    -- 有数据
+                    -- 解码
+                    local decode = base64DecodeIfNeed(raw)
+                    
+                    if #decode > 0 then
+                        -- 先删除
+                        -- fs.remove(saveFile)
+                        
+                        -- 写入文件 添加 最后一个换行 解决shell 读取问题
+                        fs.writefile(saveFile, decode .. "\n")
+                        
+                        -- 删除注释
+                        -- local comment_pattern = "^[!\\[@]+"
+                                               
+
+                        -- 删除 [ 或 ! 或 @ 或 . 或 / 开头数据
+                        -- 删除空格
+                        -- 替换 | 替换为空
+                        -- sed "/^[\[!@\.\/]/d; /^$/d; s/[|]*//g" 286cf0932c3c632d9e229d561e103f1e
+                        
+                        sys.exec(string.format("sed -i '/^[\[!@\.\/]/d; /^$/d; s/[|]*//g' %s", saveFile))
+                       
+                        
+                        status = 0
+                        message = "成功"
+                        
+                        -- 设置更新时间
+                        ucic:set(PACKAGE_NAME, name, 'update_time', os.date("%Y-%m-%d %H:%M:%S"))
+                    else
+                        status = 1
+                        message = "base64解码失败"
+                    end
+                    
+                else
+                    status = 1
+                    message = "下载失败"
+                end
+                
+                
+                -- 结果
+                local result  = {
+                    alias     = alias,
+                    address   = address,
+                    md5String = md5String,
+                    status    = status,
+                    message   = message
+                }
+                
+                -- 保存结果
+                table.insert(updateResult, result)
+            end)
+
+
+            -- 提交修改
+            ucic:commit(PACKAGE_NAME)
+            
+
+            if isNotEmpty == false then
+                -- 全部 更新才需要清理
+                -- 列出 存在 的 文件
+                local existFileIterate = fs.dir(savePath)
+                
+                -- 循环
+                for existFileName in existFileIterate
+                do
+                    -- print('existFileName:' .. existFileName)
+                    if table.contains(updateFileName, existFileName) == false then
+                        -- 文件不在 列表中 需要删除
+                        -- print('existFileName:' .. existFileName)
+                        fs.remove(savePath .. existFileName)
+                    end
+                end
+            end
+
+
+
+
+            -- 返回结果 只能是JsonObject
+            local returnData = {
+                result = updateResult
+            }
+            
+            -- 返回
+           return returnData, 0
+        end
+    },
+    
+    -- latency = {
+    --     -- 参数说明
+    --     args = {domain = "a_string", port = 123},
+    --     
+    --     -- 实际方法
+    --     call = function(args)
+    --         -- 打印 参数
+    --         -- print(json.stringify(args))
+    --         
+    --         -- 返回
+    --         local e = {}
+    -- 
+    --         -- 取值
+    --         -- 域名
+    --         local domain = args.domain
+    --         -- 端口
+    --         local port = args.port
+    -- 
+    --         -- tcping
+    --         e.latency = luci.sys.exec(string.format("echo -n $(tcping -q -c 1 -i 1 -t 2 -p %s %s 2>&1 | grep -o 'time=[0-9]*' | awk -F '=' '{print $2}') 2>/dev/null", port, domain))
+    --         if (e.latency == "") then
+    --             -- ping
+    --             e.latency = luci.sys.exec("echo -n $(ping -c 1 -W 1 %q 2>&1 | grep -o 'time=[0-9]*' | awk -F '=' '{print $2}') 2>/dev/null" % domain)
+    --             if (e.latency == "") then
+    --                 -- UDP ping test using nping
+    --                 e.latency = luci.sys.exec(string.format("echo -n $(nping --udp -c 1 -p %s %s 2>/dev/null | grep -o 'Avg rtt: [0-9.]*ms' | awk '{print $3}' | sed 's/ms//' | head -1) 2>/dev/null", port, domain))
+    --             end
+    --         end
+    -- 
+    -- 
+    --         -- 返回 只能是JsonObject
+    --        return e, 0
+    --     end
+    -- }
+    
+    latency = {
+        -- 参数说明
+        args = {sectionId = "a_string"},
+        
+        -- 实际方法
+        call = function(args)
+            -- 打印 参数
+            -- print(json.stringify(args))
+            
+            -- 返回
+            local e = {}
+
+            -- 取值
+            -- cfgid
+            local sectionId = args.sectionId
+
+            -- tcping
+            e.latency = luci.sys.exec(string.format("sh /usr/share/ssr-plus2/latency.sh %s", sectionId))
+
+
+            -- 返回 只能是JsonObject
+           return e, 0
+        end
+    }
+}
+
+-- switch (statusCode) {
+-- case 0: return _('Command OK');
+-- case 1: return _('Invalid command');
+-- case 2: return _('Invalid argument');
+-- case 3: return _('Method not found');
+-- case 4: return _('Resource not found');
+-- case 5: return _('No data received');
+-- case 6: return _('Permission denied');
+-- case 7: return _('Request timeout');
+-- case 8: return _('Not supported');
+-- case 9: return _('Unspecified error');
+-- case 10: return _('Connection lost');
+-- default: return _('Unknown error code');
+-- }
+
+-- 处理参数方法
+local function parseInput()
+	local parse = json.new()
+	local done, err
+
+	while true do
+		local chunk = io.read(4096)
+		if not chunk then
+			break
+		elseif not done and not err then
+			done, err = parse:parse(chunk)
+		end
+	end
+
+	if not done then
+		print(json.stringify({ error = err or "Incomplete input" }))
+        -- 返回参数错误
+		os.exit(2)
+	end
+
+	return parse:get()
+end
+
+-- 验证方法 和 参数
+local function validateArgs(func, uargs)
+    -- 取出方法
+	local method = methods[func]
+	if not method then
+		print(json.stringify({ error = "Method not found" }))
+        -- 返回方法不存在
+		os.exit(3)
+	end
+
+	if type(uargs) ~= "table" then
+		print(json.stringify({ error = "Invalid arguments" }))
+        -- 返回参数错误
+		os.exit(2)
+	end
+
+	uargs.ubus_rpc_session = nil
+    -- 验证传入参数 和 需要的是否符合
+	local k, v
+	local margs = method.args or {}
+	for k, v in pairs(uargs) do
+		if margs[k] == nil or
+		   (v ~= nil and type(v) ~= type(margs[k]))
+		then
+			print(json.stringify({ error = "Invalid arguments" }))
+            -- 返回参数错误
+			os.exit(2)
+		end
+	end
+
+	return method
+end
+
+
+if arg[1] == "list" then
+    local _, method, rv = nil, nil, {}
+    for _, method in pairs(methods) do rv[_] = method.args or {} end
+    print((json.stringify(rv):gsub(":%[%]", ":{}")))
+elseif arg[1] == "call" then
+    -- 处理参数
+	local args = parseInput()
+    -- 验证方法 和 参数
+	local method = validateArgs(arg[2], args)
+    -- 调用方法
+    local result, code = method.call(args)
+    -- 输出 返回数据
+    print((json.stringify(result):gsub("^%[%]$", "{}")))
+    os.exit(code or 0)
+end

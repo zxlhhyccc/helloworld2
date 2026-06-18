@@ -1,0 +1,290 @@
+--- a/DNS2SOCKS/DNS2SOCKS.c
++++ b/DNS2SOCKS/DNS2SOCKS.c
+@@ -59,6 +59,8 @@
+ static struct SEntry* g_psFirst=NULL;			//list of DNS requests and answers (cache)
+ static unsigned int g_uCacheCount=0;			//amout of entries in list g_psFirst
+ static int g_bCacheEnabled=1;					//!=0 when cache is enabled
++static int g_bFilterAEnabled = 0;				//=1 Don't include IPv4 addresses in DNS answers
++static int g_bFilterAAAAEnabled = 0;			//=1 Don't include IPv6 addresses in DNS answers
+ static struct sockaddr_storage g_sDnsSrvAddr;	//DNS server supporting TCP
+ static struct sockaddr_storage g_sSocksAddr;	//SOCKS5 server
+ static CRITICAL_SECTION g_sCritSect;			//to protect the list g_psFirst and g_uCacheCount
+@@ -741,6 +743,207 @@
+ 	return 1;	//o.k.
+ }
+ 
++static void *whine_realloc(void *ptr, size_t size)
++{
++	void *ret = realloc(ptr, size);
++
++	if (!ret)
++		OutputToLog(OUTPUT_ALL, "failed to reallocate %d bytes", (int)size);
++
++	return ret;
++}
++
++ static int expand_workspace(uint8_t ***wkspc, int *szp, int new)
++ {
++	uint8_t **p;
++	int old = *szp;
++ 
++	if (old >= new+1)
++		return 1;
++ 
++	new += 5;
++ 
++	if (!(p = whine_realloc(*wkspc, new * sizeof(uint8_t *))))
++		return 0;
++ 
++	memset(p+old, 0, new-old);
++   
++	*wkspc = p;
++	*szp = new;
++ 
++	return 1;
++ }
++
++// Filter DNS message parts
++static void FilterDnsMessage(uint16_t* u16aMessage)
++{
++	static uint8_t **rrs = NULL;
++	static int rr_sz = 0;
++
++	uint8_t *p = (uint8_t*)u16aMessage + 2;
++	size_t rr_found = 0;
++	
++
++	int32_t i32TimeToLive;
++	uint16_t u16ContentLen;
++	uint16_t u16AmountQuestions;
++	uint16_t u16AmountAnswer;
++	uint16_t u16Len;
++	uint8_t* pu8Pos;
++	uint8_t* pu8MessageEnd;
++	uint8_t u8NameLen;
++
++	u16Len = ntohs(*u16aMessage);
++	if (u16Len <= 12) 
++	{
++		OutputToLog(OUTPUT_ALL, "Invalid DNS answer detected while filter DnsMessage");	//answer has no useful information
++		return;
++	}
++		
++	pu8Pos = (uint8_t*)u16aMessage + 2;
++	pu8MessageEnd = pu8Pos + u16Len;
++	u16AmountQuestions = ntohs(((uint16_t*)pu8Pos)[2]);
++	u16AmountAnswer = ntohs(((uint16_t*)pu8Pos)[3]);
++	pu8Pos += 12;	//go behind header
++					//ignore questions
++
++	for (; u16AmountQuestions; --u16AmountQuestions)
++	{
++		//ignore name
++		for (;;)
++		{
++			if (pu8Pos >= pu8MessageEnd)
++			{
++				OutputToLog(OUTPUT_ALL, "Invalid DNS answer detected while filter DnsMessage"); //failed
++				return;
++			}
++			u8NameLen = *pu8Pos;
++			if (!u8NameLen)
++				break;	//end of name
++			if (u8NameLen >= 0xc0)	//compression used? (reference to other name via offset)
++			{
++				++pu8Pos;	//ignore 2nd part of offset
++				break;
++			}
++			pu8Pos += u8NameLen + 1;
++		}
++		pu8Pos += 5;	//ignore type and class
++	}
++		
++	//for all records
++	do
++	{
++		uint8_t *pstart = pu8Pos;
++
++		//ignore name of resource record
++		for (;;)
++		{
++			if (pu8Pos >= pu8MessageEnd)
++			{
++				OutputToLog(OUTPUT_ALL, "Invalid DNS answer detected while filter DnsMessage"); //failed
++				return;
++			}
++			u8NameLen = *pu8Pos;
++			if (!u8NameLen)
++				break;	//end of name
++			if (u8NameLen >= 0xc0)	//compression used? (reference to other name via offset)
++			{
++				++pu8Pos;	//ignore 2nd part of offset
++				break;
++			}
++			pu8Pos += u8NameLen + 1;
++		}
++		pu8Pos += 5;	//jump behind type and class
++		if (pu8Pos > pu8MessageEnd - 6)	//6: TTL + RDLEN
++		{
++			OutputToLog(OUTPUT_ALL, "Invalid DNS answer detected while filter DnsMessage"); //failed
++			return;
++		}
++
++
++		int type = ntohs(*(uint16_t*)(pu8Pos - 4));
++		
++		
++		//ignore record content
++		u16ContentLen = ntohs(*(uint16_t*)(pu8Pos + 4));
++		pu8Pos += 6 + u16ContentLen;
++		if (pu8Pos > pu8MessageEnd)
++		{
++			OutputToLog(OUTPUT_ALL, "Invalid DNS answer detected while filter DnsMessage"); //failed
++			return;
++		}
++
++		if (type == 1 && g_bFilterAEnabled)
++		{
++			// filter ipv4
++			u16AmountAnswer--;
++
++			if (!expand_workspace(&rrs, &rr_sz, rr_found + 1))
++			{
++				OutputToLog(OUTPUT_ALL, "Invalid DNS answer detected while filter DnsMessage"); //failed
++				return;
++			}
++			rrs[rr_found++] = pstart;
++			rrs[rr_found++] = pu8Pos;
++		}
++		else if (type == 28 && g_bFilterAAAAEnabled)
++		{
++			// filter ipv6 
++			u16AmountAnswer--;
++
++			if (!expand_workspace(&rrs, &rr_sz, rr_found + 1))
++			{
++				OutputToLog(OUTPUT_ALL, "Invalid DNS answer detected while filter DnsMessage"); //failed
++				return;
++			}
++
++			rrs[rr_found++] = pstart;
++			rrs[rr_found++] = pu8Pos;
++		}
++
++		//if (!u16AmountAnswer)
++		//{
++		//	// end answer
++		//	break;
++		//}
++
++	} while (pu8Pos<pu8MessageEnd);
++
++	//u16AmountQuestions = ntohs((u16aMessage)[4]);
++
++	//char str[30];
++	//sprintf(str, "last: %d", u16AmountAnswer);
++	// OutputToLog(OUTPUT_ALL, str);
++	
++	if (rr_found > 0)
++	{
++		// OutputToLog(OUTPUT_ALL, "answer count %d modify count %d", ntohs((u16aMessage)[4]), u16AmountAnswer);
++		
++		unsigned i = 0;
++		int deleteCount = 0;
++		/* Fourth pass, elide records */
++		for (p = rrs[0], i = 1; (unsigned)i < rr_found; i += 2)
++		{
++			uint8_t *start = rrs[i];
++			uint8_t *end = ((unsigned)i != rr_found - 1) ? rrs[i + 1] : ((uint8_t *)u16aMessage) + 2 + u16Len;
++
++			memmove(p, start, end - start);
++			p += end - start;
++			deleteCount += rrs[i] - rrs[i-1];
++		}
++
++		// OutputToLog(OUTPUT_ALL, "total count %d delete  count %d dataSize %d", u16Len, deleteCount, ntohs(*u16aMessage));
++		// modify first 2 byte
++		*u16aMessage = htons(u16Len - deleteCount);
++		// modify answer count
++		(u16aMessage)[4] = htons(u16AmountAnswer);
++		// OutputToLog(OUTPUT_ALL, "total count %d delete  count %d dataSize %d", u16Len, deleteCount, ntohs(*u16aMessage));
++	}
++
++	//succeeded
++}
++
++
+ //thread for connecting the SOCKS server and resolving the DNS request
+ THREAD_FUNCTION(DnsThread, pEntry)
+ {
+@@ -987,6 +1190,37 @@
+ 		return 0;
+ 	}
+ 	closesocket(hSock);
++
++
++	if (g_bFilterAEnabled || g_bFilterAAAAEnabled)
++	{
++		// need filter
++		// filter
++		FilterDnsMessage(u16aBuf);
++
++		// re calc length
++		iLen = 2 + ntohs(*u16aBuf);
++
++		// answer count FilterDnsMessage function may 0
++		uint8_t u16AmountAnswer = ntohs(u16aBuf[4]);
++
++		if (!u16AmountAnswer)
++		{
++			OutputToLog(OUTPUT_ALL, "Filter Answer return zero!");
++
++			// set Answer  solve client timeout
++			psEntry->u16aAnswer = u16aBuf;
++			// send answer
++			SendAnswer(psEntry);
++			// set Answer NULL
++			psEntry->u16aAnswer = NULL;
++			// remove
++			RemoveEntry(psEntry, hSock, g_bCacheEnabled);
++			return 0;
++		}
++	}
++
++
+ 	if(g_bCacheEnabled)
+ 	{
+ 		//store answer in cache
+@@ -1517,6 +1751,21 @@
+ 					if(szCurArg[2]==':' && ParseEcs(szCurArg+3))
+ 						continue;	//correct parameter, go to next one
+ 				}
++				break;
++			case '4':
++				if (!szCurArg[2])
++				{
++					g_bFilterAEnabled = 1;
++					continue;	//correct parameter, go to next one
++				}
++				break;
++			case '6':
++				if (!szCurArg[2])
++				{
++					g_bFilterAAAAEnabled = 1;
++					continue;	//correct parameter, go to next one
++				}
++				break;
+ 			}
+ 			//wrong/unknown parameter; display help
+ 		}
+@@ -1548,7 +1797,9 @@
+ 			"/u:User       user name if your SOCKS server uses user/password authentication\n"
+ 			"/p:Password   password if your SOCKS server uses user/password authentication\n"
+ 			"/e:IP/Bits    to enable and specify EDNS client subnet in DNS queries\n"
+-			"/ef:IP/Bits   same as above but also replaces EDNS client subnet if it exists\n\n"
++			"/ef:IP/Bits   same as above but also replaces EDNS client subnet if it exists\n"
++			"/4            Don't include IPv4 addresses in DNS answers\n"
++			"/6            Don't include IPv6 addresses in DNS answers\n\n"
+ 			"Default Socks5ServerIP:Port = %s:%s\n"
+ 			"Default DNSServerIPorName:Port = %s:%s\n"
+ 			"Default ListenIP:Port = %s:%s\n",

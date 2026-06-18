@@ -1,0 +1,53 @@
+{
+    "admin/services/ssr-plus2": {
+        "title": "ssr-plus2",
+        "order": 30,
+        "action": {
+            "type": "firstchild"
+        },
+        "depends": {
+            "acl": [ "luci-app-ssr-plus2" ],
+            "uci": { "ssr-plus2": true }
+        }
+    },
+    "admin/services/ssr-plus2/client": {
+        "title": "SSR Client",
+        "order": 10,
+        "action": {
+            "type": "view",
+            "path": "ssr-plus2/client"
+        }
+    },
+    "admin/services/ssr-plus2/servers-node": {
+        "title": "Servers Nodes",
+        "order": 15,
+        "action": {
+            "type": "view",
+            "path": "ssr-plus2/servers-node"
+        }
+    },
+    "admin/services/ssr-plus2/access-control": {
+        "title": "Access Control",
+        "order": 20,
+        "action": {
+            "type": "view",
+            "path": "ssr-plus2/access-control"
+        }
+    },
+    "admin/services/ssr-plus2/advanced": {
+        "title": "Advanced Settings",
+        "order": 25,
+        "action": {
+            "type": "view",
+            "path": "ssr-plus2/advanced"
+        }
+    },
+    "admin/services/ssr-plus2/log": {
+        "title": "Log",
+        "order": 40,
+        "action": {
+            "type": "view",
+            "path": "ssr-plus2/log"
+        }
+    }
+}

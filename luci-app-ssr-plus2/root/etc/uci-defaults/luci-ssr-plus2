@@ -1,0 +1,22 @@
+#!/bin/sh
+
+# 添加启动项 注意 添加这个 通过jsapi/lua uci commit提交配置文件变动 会自动触发 reload 方法
+#if [ -e "/etc/config/ucitrack" ]; then
+#uci -q batch <<-EOF >/dev/null
+#    delete ucitrack.@ssr-plus2[-1]
+#    add ucitrack ssr-plus2
+#    set ucitrack.@ssr-plus2[-1].init=ssr-plus2
+#    commit ucitrack
+#EOF
+#fi 
+
+
+# 重启
+# if [ -f "/etc/config/ssr-plus2" ]; then
+#     `/etc/init.d/ssr-plus2 restart &`
+# fi
+
+# 删除菜单
+`rm -rf /tmp/luci-*`
+
+exit 0

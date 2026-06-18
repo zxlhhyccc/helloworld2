@@ -1,0 +1,420 @@
+msgid ""
+msgstr ""
+
+
+#: luci-app-ssr-plus2/root/usr/share/luci/menu.d/luci-app-ssr-plus2.json:14
+msgid "SSR Client"
+msgstr "客户端"
+
+
+#: luci-app-ssr-plus2/root/usr/share/luci/menu.d/luci-app-ssr-plus2.json:22
+msgid "Servers Nodes"
+msgstr "服务器节点"
+
+
+#: luci-app-ssr-plus2/root/usr/share/luci/menu.d/luci-app-ssr-plus2.json:30
+msgid "Access Control"
+msgstr "访问控制"
+
+
+#: luci-app-ssr-plus2/root/usr/share/luci/menu.d/luci-app-ssr-plus2.json:38
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/advanced.js:33
+msgid "Advanced Settings"
+msgstr "高级设置"
+
+
+#: luci-app-ssr-plus2/root/usr/share/luci/menu.d/luci-app-ssr-plus2.json:46
+msgid "SSR Server"
+msgstr "服务端"
+
+
+#: luci-app-ssr-plus2/root/usr/share/luci/menu.d/luci-app-ssr-plus2.json:54
+msgid "Status"
+msgstr "状态"
+
+
+#: luci-app-ssr-plus2/root/usr/share/luci/menu.d/luci-app-ssr-plus2.json:62
+msgid "Log"
+msgstr "日志"
+
+
+
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:24
+msgid "RUNNING"
+msgstr "运行中"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:27
+msgid "STARTING"
+msgstr "启动中"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:31
+msgid "NOT RUNNING"
+msgstr "未运行"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:58
+msgid "ShadowSocksR Plus+ Settings"
+msgstr "ShadowSocksR Plus+ 设置"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:58
+msgid "<h3>Support Socks5/SS/SSR/Vmess/Trojan/NaiveProxy/Vless/Hysteria/Tuic/ShadowTLS etc.</h3>"
+msgstr "<h3>支持 Socks5/SS/SSR/Vmess/Trojan/NaiveProxy/Vless/Hysteria/Tuic/ShadowTLS 等协议。</h3>"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:92
+msgid "Enable Proxy"
+msgstr "开启代理"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:92
+msgid "The Client Configuration Only Take Effect After Enable Proxy."
+msgstr "开启代理后配置才生效。"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:101
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:110
+msgid "Proxy Rule"
+msgstr "代理规则"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:151
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:690
+msgid "Proxy Protocol"
+msgstr "代理类型"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:157
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:242
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:718
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/advanced.js:108
+msgid "Alias"
+msgstr "别名"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:163
+msgid "Port"
+msgstr "端口"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:169
+msgid "Enable"
+msgstr "启用"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:184
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:287
+msgid "Bypass"
+msgstr "不走代理"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:186
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:293
+msgid "Force"
+msgstr "强制代理"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:189
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:479
+msgid "Node"
+msgstr "节点"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:199
+msgid "Proxy Internal Device"
+msgstr "代理内网设备"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:232
+msgid "Proxy Address List"
+msgstr "代理地址列表"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:244
+msgid "Proxy Node"
+msgstr "代理节点列表"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:254
+msgid "Proxy Port"
+msgstr "代理端口"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:254
+msgid "Proxy Node Select Should All Port"
+msgstr "代理节点应该选择所有端口"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:258
+msgid "All Port"
+msgstr "所有端口"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:264
+msgid "DNS Server"
+msgstr "DNS 服务器"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:270
+msgid "Google Public DNS (8.8.4.4)"
+msgstr ""
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:271
+msgid "Google Public DNS (8.8.8.8)"
+msgstr ""
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:277
+msgid "filterAAAA"
+msgstr "过滤IPv6"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/client.js:277
+msgid "Close Option Ensure Proxy Node Support IPv6."
+msgstr "关闭此选项确认您的节点支持IPv6。"
+
+
+
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:238
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:247
+msgid "Subscribe URL"
+msgstr "订阅 URL"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:252
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:1821
+msgid "User Agent"
+msgstr "用户代理"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:439
+msgid "Default Group"
+msgstr "默认分组"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:296
+msgid "Subscribe Filter Words"
+msgstr "节点过滤关键字"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:296
+msgid "Filter Words Split By /."
+msgstr "命中关键字的节点将被丢弃。多个关键字用 / 分隔。"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:3430
+msgid "Filter Words Filter Out"
+msgstr "节点过滤关键字过滤了"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:299
+msgid "Update All Subscribe Servers"
+msgstr "更新所有订阅服务器节点"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:333
+msgid "Subscribe Url Not Enable."
+msgstr "订阅未启用。"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:411
+msgid "Delete All Subscribe Servers"
+msgstr "删除所有订阅服务器节点"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:411
+msgid "Server Count"
+msgstr "服务器节点数量"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:540
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:547
+msgid "Import"
+msgstr "导入配置信息"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:146
+msgid "Paste Sharing Link Here"
+msgstr "在此处粘贴分享链接"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:150
+msgid "User Cancelled."
+msgstr "用户已取消。"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:170
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:385
+msgid "Import Configuration Information Successfully."
+msgstr "导入配置信息成功。"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:2518
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:2561
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:2569
+msgid "Invalid Format."
+msgstr "无效的格式。"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:724
+msgid "Server"
+msgstr "服务器"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:733
+msgid "Server Port"
+msgstr "服务器端口"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:742
+msgid "Latency"
+msgstr "延迟"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:780
+msgid "Check"
+msgstr "检测"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:803
+msgid "Enable Authentication"
+msgstr "启用用户名/密码认证"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:815
+msgid "Username"
+msgstr "用户名"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:827
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:1396
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:2284
+msgid "Password"
+msgstr "密码"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:922
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:992
+msgid "Encrypt Method"
+msgstr "加密方式"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:939
+msgid "Enable Plugin"
+msgstr "启用插件"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:949
+msgid "Plugin"
+msgstr "插件"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:961
+msgid "Custom"
+msgstr "自定义"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:968
+msgid "Custom Plugin Path"
+msgstr "自定义插件路径"
+
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:979
+msgid "Plugin Opts"
+msgstr "插件参数"
+
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:1009
+msgid "Protocol"
+msgstr "协议"
+
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:1022
+msgid "Protocol param (optional)"
+msgstr "协议参数（可选）"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:1030
+msgid "Obfs"
+msgstr "混淆插件"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:1042
+msgid "Obfs param (optional)"
+msgstr "混淆插件参数（可选）"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:906
+msgid "TCP Fast Open"
+msgstr "TCP 快速打开"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/servers-node.js:906
+msgid "Enabling TCP Fast Open Requires Server Support."
+msgstr "启用 TCP 快速打开需要服务端支持。"
+
+
+
+
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/access-control.js:26
+msgid "Bypass Domain List(Global)"
+msgstr "不走代理的域名(全局)"
+
+
+
+
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/advanced.js:86
+msgid "Update All Domain Servers"
+msgstr "更新所有域名"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/advanced.js:86
+msgid "Please Click Save At The Bottom Of The Page First."
+msgstr "更新前，请先点击页面下方保存。"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/advanced.js:114
+msgid "Address"
+msgstr "地址"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/advanced.js:131
+msgid "Update Time"
+msgstr "更新时间"
+
+
+
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/log.js:56
+msgid "Clear Logs Fail."
+msgstr "清空日志失败。"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/log.js:87
+msgid "Log File List"
+msgstr "日志文件列表"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/log.js:89
+msgid "Clear Logs"
+msgstr "清空日志"
+
+
+#: luci-app-ssr-plus2/htdocs/luci-static/resources/view/ssr-plus2/log.js:91
+msgid "Tail Line Count"
+msgstr "后几行"

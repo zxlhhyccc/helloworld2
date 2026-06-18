@@ -1,0 +1,53 @@
+config client
+	option enable_proxy '0'
+
+config server_subscribe
+	option filter_words '过期/套餐/剩余/QQ群/官网/防失联/回国'
+
+config access_control
+
+config advanced
+
+config advanced_address
+	option alias 'v2fly/domain-list-community'
+	option address 'https://fastly.jsdelivr.net/gh/YW5vbnltb3Vz/domain-list-community@release/gfwlist.txt'
+
+config advanced_address
+	option alias 'Loyalsoldier/v2ray-rules-dat'
+	option address 'https://fastly.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/gfw.txt'
+
+config advanced_address
+	option alias 'Loukky/gfwlist-by-loukky'
+	option address 'https://fastly.jsdelivr.net/gh/Loukky/gfwlist-by-loukky/gfwlist.txt'
+
+config advanced_address
+	option alias 'gfwlist/gfwlist'
+	option address 'https://fastly.jsdelivr.net/gh/gfwlist/gfwlist/gfwlist.txt'
+
+config advanced_address
+	option alias 'Clang.CN'
+	option address 'https://ispip.clang.cn/all_cn.txt'
+
+config advanced_address
+	option alias 'Clang.CN.CIDR'
+	option address 'https://ispip.clang.cn/all_cn_cidr.txt'
+
+config advanced_address
+	option alias 'china-operator-ip'
+	option address 'https://fastly.jsdelivr.net/gh/gaoyifan/china-operator-ip@ip-lists/china.txt'
+
+config advanced_address
+	option alias 'Netflix Domain'
+	option address 'https://fastly.jsdelivr.net/gh/lingchenzi/app/media/Netflix_Domain'
+
+config advanced_address
+	option alias 'Netflix IP Only'
+	option address 'https://fastly.jsdelivr.net/gh/QiuSimons/Netflix_IP/NF_only.txt'
+
+config advanced_address
+	option alias 'Netflix and AWS'
+	option address 'https://fastly.jsdelivr.net/gh/QiuSimons/Netflix_IP/getflix.txt'
+
+config advanced_address
+	option alias 'Telegram IP'
+	option address 'https://core.telegram.org/resources/cidr.txt'
