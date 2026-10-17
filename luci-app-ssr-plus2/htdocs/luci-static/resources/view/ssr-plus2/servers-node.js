@@ -178,11 +178,11 @@ var importClickFunction = function (section_id, ev) {
 // 显示延迟
 function latencyShow(section_id, latency) {
     // tr
-    var trNode = document.getElementById('cbi-%s-%s'.format(PACKAGE_NAME, section_id));
+    var trEl = document.getElementById('cbi-%s-%s'.format(PACKAGE_NAME, section_id));
     // 获取 子元素
-    for(var i = 0; i < trNode.children.length; i++) {
+    for(var i = 0; i < trEl.children.length; i++) {
         // 子元素
-        var children = trNode.children[i];
+        var children = trEl.children[i];
         
         if (children.dataset.name === 'latency') {
             // latency 延迟
@@ -200,6 +200,18 @@ function latencyShow(section_id, latency) {
 
 var globalThis, filterWordsRegExp;
 var viewExtend = view.extend({
+    
+    // 选中节点pane id
+    subscribeActivePaneId: null,
+    
+    // 获取
+    callFileExec: rpc.declare({
+        object: 'file',
+        method: 'exec',
+        params: ['command', 'params', 'env'],
+        nobatch: true
+    }),
+    
     load: function() {
         return Promise.all([
             uci.load(PACKAGE_NAME)
@@ -312,7 +324,7 @@ var viewExtend = view.extend({
                 // 不存在
                 filterWordsRegExp = null;
             }
-            
+            var needHandleSave = false;
             var tasks = [];
             // 循环
             for (var i = 0; i < subscribe.length; i++) {
@@ -326,14 +338,13 @@ var viewExtend = view.extend({
                 // user agent
                 var userAgent = item['user_agent'] || '';
                 // 是否启用
-                var enable = item['enable'] || '';
-                
+                var enable = item['enable'] || '';                
                 if ('1' !== enable) {
                     // 未启用
                     ui.addNotification(null, E('p', _("Subscribe Url Not Enable.") + '(' + alias + ')'));
                     continue;
                 }
-                
+                var needSave = false;
                 // 调用订阅
                 await fs.exec_direct('/etc/init.d/ssr-plus2', ['mycurl', subscribeUrl, userAgent]).then(
                     ev.view.L.bind(async function(name, alias, response) {
@@ -347,7 +358,6 @@ var viewExtend = view.extend({
                             var nodeArr = decodeString.trim().split('\r\n');
                             // 长度
                             var length = nodeArr.length;                            
-                            
                             // 计算md5 并 转成字符串
                             var groupHash = CryptoJS.MD5(name).toString();
                             
@@ -361,6 +371,7 @@ var viewExtend = view.extend({
                                         // 相同 分组
                                         // 删除配置
                                         uci.remove(PACKAGE_NAME, s['.name']);
+                                        needSave = true;
                                     }
                                 });
                             }
@@ -368,26 +379,26 @@ var viewExtend = view.extend({
                             for (var i = 0; i < length; i++) {
                                 // 节点信息
                                 var node = nodeArr[i];
-                                // console.log(node);
-                                
+                                // console.log(node);                                
                                 if ('' === node) {
                                     // 空字符串
                                     continue;
                                 }
-
                                 // 导入
-                                var importResult = importUri(null, node, groupHash);
-                                
+                                var importResult = importUri(null, node, groupHash);                                
                                 if (true === importResult) {
                                     // 导入成功
+                                    needSave = true;
                                     // ui.addNotification(null, E('p', _("Import Configuration Information Successfully.") + '(' + alias + ')' + '(' + node + ')'));
                                 } else {
                                     // 导入失败
                                     ui.addNotification(null, E('p', importResult + '(' + alias + ')'));
                                 }
                             }
-                            // 提交数据 避免一次性提交(如果有多个订阅 数据过多 提交会失败)
-                            await uci.save();
+                            if (needSave) {
+                                // 提交数据 避免一次性提交(如果有多个订阅 数据过多 一次性提交会失败)
+                                await uci.save();
+                            }
                         } else {
                             // 提示错误
                             ui.addNotification(null, E('p', _("Empty") + '(' + alias + ')'));
@@ -399,18 +410,19 @@ var viewExtend = view.extend({
                         ui.addNotification(null, E('p', _('Apply request failed with status <code>%h</code>').format(error.message + '(' + alias + ')')));
                     }, this, alias)
                 );
+                needHandleSave = needHandleSave || needSave;
             }
-            
-            
-            return globalThis.super('handleSave', ev).then(function() {
-                ui.changes.apply(true);
-            });
+            if (needHandleSave) {
+                return globalThis.super('handleSave', ev).then(function() {
+                    ui.changes.apply(true);
+                });
+            }
         };
 
         // 删除所有订阅服务器节点
         option = section.option(form.Button, "", _("Delete All Subscribe Servers"), _("Server Count") + '<span id=node_number>' + uci.sections(PACKAGE_NAME, 'node').length || 0 + '</span>');
         // 样式
-        option.inputstyle = "reset";
+        option.inputstyle = "reset"; 
         // 自定义事件
         option.onclick = function(ev, section_id) {
             // 删除 订阅配置
@@ -429,7 +441,36 @@ var viewExtend = view.extend({
             });
         };
 
-
+        // 延迟检测
+        option = section.option(form.Button, "", _("Latency Check"));
+        // 样式
+        option.inputstyle = "apply";
+        // 自定义事件
+        option.onclick = function(ev, section_id) {
+            // 获取 表格
+            const activePane = document.getElementById(globalThis.subscribeActivePaneId);
+            if (activePane) {
+                const activePaneTable = activePane.querySelector('table');
+                if (activePaneTable) {
+                    const trs = activePaneTable.querySelectorAll('tr');
+                    trs.forEach((trEl, index) => {
+                        for(var i = 0; i < trEl.children.length; i++) {
+                            // 子元素
+                            var children = trEl.children[i];
+                            
+                            if (children.dataset.name === 'check') {
+                                // 延迟 检测 按钮
+                                const checkButton = children.querySelector("button");
+                                if (checkButton) {
+                                    // 触发事件
+                                    setTimeout(() => checkButton.dispatchEvent(new Event('click')), 1000 * index)
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        }
 
 
         // 分组信息
@@ -586,7 +627,22 @@ var viewExtend = view.extend({
 
         
         // 渲染
-        return map.render();
+        return map.render().then(function(mapEl) {
+            // 获取 tab 元素
+            const tabGroups = mapEl.querySelectorAll('.cbi-map-tabbed, .cbi-section-node-tabbed');
+            // 循环
+            for (let i = 0; i < tabGroups.length; i++) {
+                // 添加事件监听
+                tabGroups[i].childNodes.forEach(pane => {
+                    pane.addEventListener('cbi-tab-active', function(ev) {
+                        // 当前pane id
+                        globalThis.subscribeActivePaneId = ev.target.id;
+                    });
+                });
+            }
+            // 返回
+            return mapEl;
+        });
     },
 
     // 不展示 保存并应用 按钮
@@ -786,7 +842,7 @@ function createNodeInfo(section, groupHash) {
     option.editable = true;
     // 自定义事件
     option.onclick = function(ev, section_id) {
-        return fs.exec('/etc/init.d/ssr-plus2', ['latency', section_id]).then(L.bind(function(section_id, data) {
+        return globalThis.callFileExec('/etc/init.d/ssr-plus2', ['latency', section_id]).then(L.bind(function(section_id, data) {
             // console.log(section_id)
             // console.log(data)
             var latency = (data.stdout || '').trim();
@@ -1569,11 +1625,11 @@ function vlessNodeInfo(section) {
     option.modalonly = true;  
     
     option.value("");
+    option.value("xtls-rprx-direct");
     option.value("xtls-rprx-vision");
     option.value("xtls-rprx-vision-udp443");
     // 依赖
     option.depends("protocol", "vless");
-
 
     
 
@@ -3108,11 +3164,27 @@ function importVless(section_id, rawUrl, groupHash) {
     // 节点数据
     var nodeData = {};
     // 临时变量
-    var url, params;
+    var useRawUrl, url, params;
     
-    
+    if (/^[a-zA-Z0-9=]+\?.*/.test(rawUrl)) {
+        // Shadowrocket 客户端格式
+        // console.log('Shadowrocket');
+        var index = rawUrl.indexOf('?');
+        // 截取
+        var base64String = rawUrl.substring(0, index);
+        // 解码
+        var info = CryptoJS.enc.Base64.parse(base64String).toString(CryptoJS.enc.Utf8);
+        // 分割
+        var infoArr = customSplit(info, ':');
+        useRawUrl = infoArr[1] + rawUrl.substring(index);
+    } else {
+        // 正常 格式
+        // console.log('正常格式');
+        useRawUrl = rawUrl
+    }
+
     try {
-        url = new URL("http://" + rawUrl);
+        url = new URL("http://" + useRawUrl);
         params = url.searchParams;
     } catch(e) {
         return;
@@ -3123,7 +3195,7 @@ function importVless(section_id, rawUrl, groupHash) {
     // 协议类型
     nodeData['protocol'] = 'vless';
     // 别名
-    nodeData['alias'] = url.hash ? decodeURIComponent(url.hash.slice(1)) : "";
+    nodeData['alias'] = url.hash ? decodeURIComponent(url.hash.slice(1)) : (params.get('remark') ? decodeURIComponent(params.get('remark')) : "");
     var filterResult =  filterAlias(nodeData['alias']); if (filterResult) { return filterResult; }
     // 地址
     nodeData['server'] = parseServer(url.hostname);
@@ -3138,6 +3210,13 @@ function importVless(section_id, rawUrl, groupHash) {
     // 
     nodeData['vless_flow'] = params.get("flow") || "";
 
+    // Shadowrocket 客户端格式 参数
+    var shadowsocketXtls = params.get('xtls');
+    if (shadowsocketXtls == "1") {
+        nodeData['vless_flow'] = 'xtls-rprx-direct';
+    } else if (shadowsocketXtls == "2") {
+        nodeData['vless_flow'] = 'xtls-rprx-vision';
+    }
 
     // 
     nodeData['vless_stream_network'] = params.get("type") === "http" ? "httpupgrade" : 
@@ -3221,7 +3300,16 @@ function importVless(section_id, rawUrl, groupHash) {
 
     // 
     nodeData['vless_stream_security'] = params.get("security");
-
+    
+    if (params.get('tls')) {
+        // Shadowrocket 客户端格式 参数
+        if (params.get("pbk") || params.get("sid") || params.get("spx")) {
+            // 有 这些参数 认为 是 reality
+            nodeData['vless_stream_security'] = 'reality';
+        } else {
+            nodeData['vless_stream_security'] = 'tls';
+        }
+    }
     
     if (nodeData['vless_stream_security'] === 'tls') {
         // 

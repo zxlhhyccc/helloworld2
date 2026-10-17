@@ -12,9 +12,17 @@
 
 'require fs';
 
+// 引入 crypto-js
+let script = document.createElement("script");
+script.type = "text/javascript";
+script.src = L.resource('ssr-plus2/crypto-js.js');
+document.head.appendChild(script);
+
 // 包名
 var PACKAGE_NAME = 'ssr-plus2';
 
+// 默认分组名称
+var defaultGroupName = 'default';
 
 function renderStatus(stats) {
     var spanTemp = '<em><b style=color:%s>ShadowsocksR Plus+ %s</b></em>'
@@ -39,7 +47,7 @@ return view.extend({
         object: 'luci-rpc',
         method: 'getHostHints',
         expect: { '': {} }
-    }),
+    }), 
     
     load: function() {
         return Promise.all([
@@ -50,8 +58,28 @@ return view.extend({
 
     render: function(data) {
         var hosts = data[0];
+
+
+        // 获取订阅服务器 数据
+        var subscribe = uci.sections(PACKAGE_NAME, 'subscribe');
+        // 插入默认节点
+        subscribe.splice(0, 0, {"alias": _("Default Group"), "url": "", "user_agent": ""});
         
-        
+        var subscribeMap = {};
+        for (var i = 0; i < subscribe.length; i++) {
+            var item = subscribe[i];
+            // 名称
+            var name = item['.name'] || defaultGroupName;
+            // 别名
+            var alias = item['alias'];
+            
+            // 计算md5 并 转成字符串
+            var groupHash = CryptoJS.MD5(name).toString();
+            
+            subscribeMap[groupHash] = alias;
+        }
+
+
         var map, section, option;
         
         // 创建 Map
@@ -131,7 +159,7 @@ return view.extend({
             // 协议类型
             uci.set(PACKAGE_NAME, section_id, 'protocol', nodeData['protocol']);
             // 别名
-            uci.set(PACKAGE_NAME, section_id, 'alias', nodeData['alias'] || '');
+            uci.set(PACKAGE_NAME, section_id, 'alias', (subscribeMap[nodeData['group_hash']] || _("Default Group")) + '_' + (nodeData['alias'] || ''));
             // 端口
             uci.set(PACKAGE_NAME, section_id, 'server_port', nodeData['server_port']);
             // 是否启用
@@ -191,7 +219,7 @@ return view.extend({
         option.modalonly = true;
         // 循环 节点列表
         uci.sections(PACKAGE_NAME, 'node', function(section) {
-            option.value(section['.name'], section['alias']);
+            option.value(section['.name'], (subscribeMap[section['group_hash']] || _("Default Group")) + '_' + section['protocol'] + '_' + section['alias']);
         });
 
         
@@ -270,7 +298,7 @@ return view.extend({
         option.value('8.8.8.8:53', _("Google Public DNS (8.8.8.8)"));
         option.value('8.8.4.4:53', _("Google Public DNS (8.8.4.4)"));
         // 默认值
-        option.default = '8.8.4.4:53';
+        option.default = '8.8.8.8:53';
 
 
         // 过滤IPv6
@@ -284,13 +312,13 @@ return view.extend({
 
         
         // 不走代理
-        option = section.taboption('pass', form.DynamicList, 'pass', _('Bypass'));
+        option = section.taboption('pass', form.DynamicList, 'pass', _('Bypass'), _("Sample: google, it will delete all contents that contain 'google'."));
         // 只展示在弹出框
         option.modalonly = true;
 
         
         // 强制走代理
-        option = section.taboption('force', form.DynamicList, 'force', _('Force'));
+        option = section.taboption('force', form.DynamicList, 'force', _('Force'), _("Sample: google.com."));
         // 只展示在弹出框
         option.modalonly = true;
 

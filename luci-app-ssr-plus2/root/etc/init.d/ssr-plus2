@@ -678,7 +678,8 @@ start() {
                     do
                         # 域名
                         # 删除操作
-                        `sed -i "/^${line}$/d" ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf`
+                        # `sed -i "/^${line}$/d" ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf`
+                        `sed -i "/\\/${line}\\//d" ${DNSMASQ_CONFIG_PATH}/proxy-${ruleIndex}.conf`
                     done
                 done < ${ADDRESS_FILE}
             fi
@@ -746,7 +747,8 @@ start() {
                 fi
 
                 # 保存 保存为 sed 格式 使用 sed -f 删除
-                echo "/^${line}$/d" >> ${FORCE_FILE}
+                # echo "/^${line}$/d" >> ${FORCE_FILE}
+                echo "/\\/${line}\\//d" >> ${FORCE_FILE}
             elif [[ "${line}" =~ "^[a-zA-Z0-9]{1,62}$" ]]; then
                 # 域名 只有数字和字母 也认为是域名
                 # 输出 server
@@ -763,7 +765,8 @@ start() {
                 fi
 
                 # 保存 保存为 sed 格式 使用 sed -f 删除
-                echo "/^${line}$/d" >> ${FORCE_FILE}
+                # echo "/^${line}$/d" >> ${FORCE_FILE}
+                echo "/\\/${line}\\//d" >> ${FORCE_FILE}
             else
                 # 其他 默认为 ipv6
                 # 添加 到 v6
