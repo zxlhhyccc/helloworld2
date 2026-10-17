@@ -30,18 +30,29 @@ password=$(uci_get_by_name ${cfgid} password)
 
 
 # 上行速度
-up=$(uci_get_by_name ${cfgid} hysteria2_up)
+up=$(uci_get_by_name ${cfgid} hysteria2_up_mbps)
 if [[ "${up}" =~ "^[0-9]+$" ]]; then
     # 数字
-    up="${up} mbps"
+    up="
+  up: ${up} mbps"
 fi
 
 # 下行速度
-down=$(uci_get_by_name ${cfgid} hysteria2_down)
+down=$(uci_get_by_name ${cfgid} hysteria2_down_mbps)
 if [[ "${down}" =~ "^[0-9]+$" ]]; then
     # 数字
-    down="${down} mbps"
+    down="
+  down: ${down} mbps"
 fi
+
+bandwidth=""
+if [[ "${up}" != "" || "${down}" != "" ]]; then
+    bandwidth="
+
+bandwidth:${up}${down}
+"
+fi
+
 
 # TLS
 tls_settings=""
@@ -84,7 +95,7 @@ if [ "${transport}" == "1" ]; then
 transport:
   type: ${transport_type}
   ${transport_type}:
-    hopInterval: ${transport_hopInterval}"
+    hopInterval: ${transport_hopInterval}s"
 fi
 
 
@@ -137,11 +148,7 @@ tproxyPort=$(get_port $((redirectPort+1)))
 cat <<-EOF > "${TEMP_PATH}/proxy-${ruleIndex}.yaml"
 server: ${server}:${server_port} 
 
-auth: ${password}
-
-bandwidth:
-  up: ${up}
-  down: ${down}
+auth: ${password}${bandwidth}
 
 socks5:
   listen: 0.0.0.0:${socks5Port}

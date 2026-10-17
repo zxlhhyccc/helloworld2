@@ -97,20 +97,9 @@ config PACKAGE_$(PKG_NAME)_INCLUDE_ShadowsocksR_Libev_Client
     default n
 
 
-choice
-    prompt "Vmess/Vless Selection"
-    default PACKAGE_$(PKG_NAME)_INCLUDE_Xray if aarch64||arm||i386||x86_64
-    default PACKAGE_$(PKG_NAME)_INCLUDE_NONE_V2RAY
-
-    config PACKAGE_$(PKG_NAME)_INCLUDE_NONE_V2RAY
-    bool "None"
-
-    config PACKAGE_$(PKG_NAME)_INCLUDE_V2ray
-    bool "V2ray-core"
-
-    config PACKAGE_$(PKG_NAME)_INCLUDE_Xray
-    bool "Xray-core"
-endchoice
+config PACKAGE_$(PKG_NAME)_INCLUDE_V2ray
+    bool "Include V2ray-core(Vmess)"
+    default n
 
 
 config PACKAGE_$(PKG_NAME)_INCLUDE_Trojan
@@ -123,6 +112,11 @@ config PACKAGE_$(PKG_NAME)_INCLUDE_NaiveProxy
     bool "Include NaiveProxy"
     select PACKAGE_$(PKG_NAME)_INCLUDE_IPT2Socks
     depends on !(arc||armeb||mips||mips64||powerpc||TARGET_gemini)
+    default n
+
+
+config PACKAGE_$(PKG_NAME)_INCLUDE_Xray
+    bool "Include Xray-core(Vless)"
     default n
 
 

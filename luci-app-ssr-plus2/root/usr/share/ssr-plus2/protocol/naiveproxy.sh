@@ -97,6 +97,8 @@ if [ "${count}" == "0" ]; then
     # 启动失败
     # 返回空字符串
     echo ""
+    # 退出
+    exit
 else
     # 启动成功
     # 保存 进程ID
@@ -133,6 +135,8 @@ if [ "${count}" == "0" ]; then
     
     # 返回空字符串
     echo ""
+    # 退出
+    exit
 else
     # 启动成功
     # 保存 进程ID
@@ -168,6 +172,8 @@ if [ "${count}" == "0" ]; then
     for temp in ${tempPid}; do kill ${temp} 2>/dev/null; done
     # 返回空字符串
     echo ""
+    # 退出
+    exit
 else
     # 启动成功
     # 保存 进程ID

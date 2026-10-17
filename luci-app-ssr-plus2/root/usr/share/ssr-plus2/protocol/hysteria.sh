@@ -23,10 +23,48 @@ server_port=$(uci_get_by_name ${cfgid} server_port)
 # 密码
 password=$(uci_get_by_name ${cfgid} password)
 
+
+protocol=$(uci_get_by_name ${cfgid} hysteria_protocol)
+if [ "${protocol}" != "" ]; then
+    protocol=",
+    \"protocol\": \"${protocol}\""
+fi
+
+
 # 上行速度
-up=$(uci_get_by_name ${cfgid} hysteria_up)
+up_mbps=$(uci_get_by_name ${cfgid} hysteria_up_mbps)
+if [ "${up_mbps}" != "" ]; then
+    up_mbps=",
+    \"up_mbps\": ${up_mbps}"
+fi
+
 # 下行速度
-down=$(uci_get_by_name ${cfgid} hysteria_down)
+down_mbps=$(uci_get_by_name ${cfgid} hysteria_down_mbps)
+if [ "${down_mbps}" != "" ]; then
+    down_mbps=",
+    \"down_mbps\": ${down_mbps}"
+fi
+
+obfs_password=$(uci_get_by_name ${cfgid} hysteria_obfs_password)
+if [ "${obfs_password}" != "" ]; then
+    obfs_password=",
+    \"obfs\": \"${obfs_password}\""
+fi
+
+server_name=$(uci_get_by_name ${cfgid} hysteria_server_name)
+if [ "${server_name}" != "" ]; then
+    server_name=",
+    \"server_name\": \"${server_name}\""
+fi
+
+allow_insecure=$(uci_get_by_name ${cfgid} hysteria_allow_insecure)
+if [ "${allow_insecure}" == "1" ]; then
+    allow_insecure=",
+    \"insecure\": true"
+else
+    allow_insecure=",
+    \"insecure\": false"
+fi
 
 
 # 获取 socks5 端口
@@ -41,22 +79,20 @@ tproxyPort=$(get_port $((redirectPort+1)))
 # 输出配置文件
 cat <<-EOF > "${TEMP_PATH}/proxy-${ruleIndex}.json"
 {
-  "server": "${server}:${server_port}",
-  "obfs": "${password}",
-  "up_mbps": ${up},
-  "down_mbps": ${down},
-  "socks5": {
+    "server": "${server}:${server_port}",
+    "auth": "${password}"${protocol}${up_mbps}${down_mbps}${obfs_password}${server_name}${allow_insecure}
+    "socks5": {
     "listen": "0.0.0.0:${socks5Port}"
-  },
-  "tproxy_tcp": {
+    },
+    "tproxy_tcp": {
     "listen": ":${tproxyPort}"
-  },
-  "tproxy_udp": {
+    },
+    "tproxy_udp": {
     "listen": ":${tproxyPort}"
-  },
-  "redirect_tcp": {
+    },
+    "redirect_tcp": {
     "listen": ":${redirectPort}"
-  }
+    }
 }
 EOF
 

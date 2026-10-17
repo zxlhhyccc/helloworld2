@@ -35,6 +35,8 @@ socks5)
         resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-v2ray.sh ${ruleIndex} ${cfgid}`
     elif [ `command -v xray | wc -l` == 1 ]; then
         resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-xray.sh ${ruleIndex} ${cfgid}`
+    elif [ `command -v sing-box | wc -l` == 1 ]; then
+        resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-sing-box.sh ${ruleIndex} ${cfgid}`
     else
         echolog "无启动sockes5协议工具"
         resultPort=""
@@ -50,6 +52,8 @@ ss)
         resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-v2ray.sh ${ruleIndex} ${cfgid}`
     elif [ `command -v xray | wc -l` == 1 ]; then
         resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-xray.sh ${ruleIndex} ${cfgid}`
+    elif [ `command -v sing-box | wc -l` == 1 ]; then
+        resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-sing-box.sh ${ruleIndex} ${cfgid}`
     else
         echolog "无启动ss协议工具"
         resultPort=""
@@ -70,6 +74,8 @@ vmess)
         resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-v2ray.sh ${ruleIndex} ${cfgid}`
     elif [ `command -v xray | wc -l` == 1 ]; then
         resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-xray.sh ${ruleIndex} ${cfgid}`
+    elif [ `command -v sing-box | wc -l` == 1 ]; then
+        resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-sing-box.sh ${ruleIndex} ${cfgid}`
     else
         echolog "无启动vmess协议工具"
         resultPort=""
@@ -79,6 +85,12 @@ trojan)
     # trojan 协议
     if [ `command -v trojan | wc -l` == 1 ]; then
         resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}.sh ${ruleIndex} ${cfgid}`
+    elif [ `command -v v2ray | wc -l` == 1 ]; then
+        resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-v2ray.sh ${ruleIndex} ${cfgid}`
+    elif [ `command -v xray | wc -l` == 1 ]; then
+        resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-xray.sh ${ruleIndex} ${cfgid}`
+    elif [ `command -v sing-box | wc -l` == 1 ]; then
+        resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-sing-box.sh ${ruleIndex} ${cfgid}`
     else
         echolog "无启动trojan协议工具"
         resultPort=""
@@ -86,7 +98,7 @@ trojan)
     ;;
 naiveproxy)
     # naiveproxy 协议
-    if [ `command -v v2ray | wc -l` == 1 ]; then
+    if [ `command -v naive | wc -l` == 1 ]; then
         resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}.sh ${ruleIndex} ${cfgid}`
     else
         echolog "无启动naiveproxy协议工具"
@@ -95,10 +107,12 @@ naiveproxy)
     ;;
 vless)
     # vless 协议
-    if [ `command -v v2ray | wc -l` == 1 ]; then
-        resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-v2ray.sh ${ruleIndex} ${cfgid}`
-    elif [ `command -v xray | wc -l` == 1 ]; then
+    if [ `command -v xray | wc -l` == 1 ]; then
         resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-xray.sh ${ruleIndex} ${cfgid}`
+    elif [ `command -v v2ray | wc -l` == 1 ]; then
+        resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-v2ray.sh ${ruleIndex} ${cfgid}`
+    elif [ `command -v sing-box | wc -l` == 1 ]; then
+        resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-sing-box.sh ${ruleIndex} ${cfgid}`
     else
         echolog "无启动vless协议工具"
         resultPort=""
@@ -108,6 +122,8 @@ hysteria)
     # hysteria 协议
     if [ `command -v hysteria | wc -l` == 1 ]; then
         resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}.sh ${ruleIndex} ${cfgid}`
+    elif [ `command -v sing-box | wc -l` == 1 ]; then
+        resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-sing-box.sh ${ruleIndex} ${cfgid}`
     else
         echolog "无启动hysteria协议工具"
         resultPort=""
@@ -117,6 +133,8 @@ tuic)
     # tuic 协议
     if [ `command -v tuic | wc -l` == 1 ]; then
         resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}.sh ${ruleIndex} ${cfgid}`
+    elif [ `command -v sing-box | wc -l` == 1 ]; then
+        resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-sing-box.sh ${ruleIndex} ${cfgid}`
     else
         echolog "无启动tuic协议工具"
         resultPort=""
@@ -124,8 +142,12 @@ tuic)
     ;;
 shadowtls)
     # shadowtls 协议
-    echolog "无启动shadowtls协议工具"
-    resultPort=""
+    if [ `command -v sing-box | wc -l` == 1 ]; then
+        resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-sing-box.sh ${ruleIndex} ${cfgid}`
+    else
+        echolog "无启动tuic协议工具"
+        resultPort=""
+    fi
     ;;
 hysteria2)
     # hysteria2 协议
@@ -139,7 +161,7 @@ hysteria2)
 anytls)
     # AnyTLS 协议
     if [ `command -v sing-box | wc -l` == 1 ]; then
-        resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}.sh ${ruleIndex} ${cfgid}`
+        resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-sing-box.sh ${ruleIndex} ${cfgid}`
     else
         echolog "无启动AnyTLS协议工具"
         resultPort=""

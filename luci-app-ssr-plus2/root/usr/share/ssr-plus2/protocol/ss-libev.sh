@@ -65,7 +65,7 @@ fi
 socks5Port=$(get_port)
 # # 获取 redirect 端口
 # redirectPort=$(get_port $((socks5Port+1)))
-# # 获取 tprox 端口
+# # 获取 tproxy 端口
 # tproxyPort=$(get_port $((redirectPort+1)))
 
 
@@ -120,6 +120,8 @@ if [ "${count}" == "0" ]; then
     # 启动失败
     # 返回空字符串
     echo ""
+    # 退出
+    exit
 else
     # 启动成功
     # 保存 进程ID
@@ -156,6 +158,8 @@ if [ "${count}" == "0" ]; then
     
     # 返回空字符串
     echo ""
+    # 退出
+    exit
 else
     # 启动成功
     # 保存 进程ID
@@ -164,7 +168,7 @@ fi
 
 
 # tproxy
-# 获取 tprox 端口
+# 获取 tproxy 端口
 tproxyPort=$(get_port $((redirectPort+1)))
 
 
@@ -191,6 +195,8 @@ if [ "${count}" == "0" ]; then
     for temp in ${tempPid}; do kill ${temp} 2>/dev/null; done
     # 返回空字符串
     echo ""
+    # 退出
+    exit
 else
     # 启动成功
     # 保存 进程ID

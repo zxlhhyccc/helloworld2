@@ -7,11 +7,12 @@
 . /usr/share/ssr-plus2/utils.sh
 
 # 启动顺序
-START=95
+START=99
 # 关闭顺序
 STOP=15
 # 服务方式
 SERVICE_DAEMONIZE=1
+
 
 # 自定义命令
 EXTRA_COMMANDS='status updateAdvancedAddress mycurl list readLog latency'

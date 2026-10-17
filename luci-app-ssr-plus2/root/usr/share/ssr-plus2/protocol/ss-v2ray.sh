@@ -43,8 +43,8 @@ if [ "${enable_plugin}" == "1" ]; then
     plugin_opts=$(uci_get_by_name ${cfgid} ss_plugin_opts)
     
     plugin_str="
-    \"plugin\": \"${plugin}\",
-    \"plugin_opts\": \"${plugin_opts}\","
+        \"plugin\": \"${plugin}\",
+        \"plugin_opts\": \"${plugin_opts}\","
 fi
 
 # TCP 快速打开
@@ -64,7 +64,8 @@ fi
 socks5Port=$(get_port)
 # 获取 redirect 端口
 redirectPort=$(get_port $((socks5Port+1)))
-
+# 获取 tproxy 端口
+tproxyPort=$(get_port $((redirectPort+1)))
 
 
 # 输出配置文件
@@ -75,17 +76,17 @@ cat <<-EOF > "${TEMP_PATH}/proxy-${ruleIndex}.json"
     },
     "inbounds": [
         {
-            "port": ${socks5Port},
-            "listen": "0.0.0.0",
             "protocol": "socks",
+            "listen": "0.0.0.0",
+            "port": ${socks5Port},
             "settings": {
                 "udp": true
             }
         },
         {
-            "port": ${redirectPort},
-            "listen": "0.0.0.0",
             "protocol": "dokodemo-door",
+            "listen": "0.0.0.0",
+            "port": ${redirectPort},
             "settings": {
                 "network": "tcp,udp",
                 "followRedirect": true
@@ -97,9 +98,9 @@ cat <<-EOF > "${TEMP_PATH}/proxy-${ruleIndex}.json"
             }
         },
         {
-            "port": ${redirectPort},
-            "listen": "0.0.0.0",
             "protocol": "dokodemo-door",
+            "listen": "0.0.0.0",
+            "port": ${tproxyPort},
             "settings": {
                 "network": "tcp,udp",
                 "followRedirect": true
@@ -130,7 +131,7 @@ cat <<-EOF > "${TEMP_PATH}/proxy-${ruleIndex}.json"
 EOF
 
 # 启动程序
-v2ray -c ${TEMP_PATH}/proxy-${ruleIndex}.json > ${TEMP_PATH}/proxy-${ruleIndex}.out 2>&1 &
+v2ray run -c ${TEMP_PATH}/proxy-${ruleIndex}.json > ${TEMP_PATH}/proxy-${ruleIndex}.out 2>&1 &
 
 # 进程号
 pid=$!
@@ -154,5 +155,5 @@ else
     echo "${pid}" >> ${TEMP_PATH}/pid
     
     # 返回 端口
-    echo "${socks5Port},${redirectPort}"
+    echo "${socks5Port},${redirectPort},${tproxyPort}"
 fi

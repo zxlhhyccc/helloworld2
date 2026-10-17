@@ -24,11 +24,40 @@ username=$(uci_get_by_name ${cfgid} username)
 # 密码
 password=$(uci_get_by_name ${cfgid} password)
 
-# 上行速度
-up=$(uci_get_by_name ${cfgid} hysteria_up)
-# 下行速度
-down=$(uci_get_by_name ${cfgid} hysteria_down)
 
+congestion_control=$(uci_get_by_name ${cfgid} tuic_congestion_control)
+if [ "${congestion_control}" != "" ]; then
+    congestion_control="
+congestion_control = \"${congestion_control}\""
+fi
+
+udp_relay_mode=$(uci_get_by_name ${cfgid} tuic_udp_relay_mode)
+if [ "${udp_relay_mode}" != "" ]; then
+    udp_relay_mode="
+udp_relay_mode = \"${udp_relay_mode}\""
+fi
+
+zero_rtt_handshake=$(uci_get_by_name ${cfgid} tuic_zero_rtt_handshake)
+if [ "${zero_rtt_handshake}" == "1" ]; then
+    zero_rtt_handshake=true
+else
+    zero_rtt_handshake=false
+fi
+
+alpn=$(uci_get_by_name ${cfgid} tuic_alpn)
+if [ "${alpn}" != "" ]; then
+    alpn="
+alpn = \"${alpn}\""
+fi
+
+sni=$(uci_get_by_name ${cfgid} tuic_sni)
+
+allow_insecure=$(uci_get_by_name ${cfgid} tuic_allow_insecure)
+if [ "${allow_insecure}" == "1" ]; then
+    allow_insecure="
+disable_sni = true
+sni = \"${sni}\""
+fi
 
 # 获取 socks5 端口
 socks5Port=$(get_port)
@@ -46,9 +75,8 @@ log_level = "info"
 [relay]
 server = "${server}:${server_port}"
 uuid = "${username}"
-password = "${password}"
-udp_relay_mode = "quic"
-zero_rtt_handshake = true
+password = "${password}"${congestion_control}${udp_relay_mode}
+zero_rtt_handshake = ${zero_rtt_handshake}${alpn}${allow_insecure}
 
 [local]
 server = "0.0.0.0:${socks5Port}"
@@ -77,6 +105,8 @@ if [ "${count}" == "0" ]; then
     # 启动失败
     # 返回空字符串
     echo ""
+    # 退出
+    exit
 else
     # 启动成功
     # 保存 进程ID
@@ -113,6 +143,8 @@ if [ "${count}" == "0" ]; then
     
     # 返回空字符串
     echo ""
+    # 退出
+    exit
 else
     # 启动成功
     # 保存 进程ID
@@ -148,6 +180,8 @@ if [ "${count}" == "0" ]; then
     for temp in ${tempPid}; do kill ${temp} 2>/dev/null; done
     # 返回空字符串
     echo ""
+    # 退出
+    exit
 else
     # 启动成功
     # 保存 进程ID
