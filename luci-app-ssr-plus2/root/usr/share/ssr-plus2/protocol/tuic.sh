@@ -32,12 +32,10 @@ down=$(uci_get_by_name ${cfgid} hysteria_down)
 
 # 获取 socks5 端口
 socks5Port=$(get_port)
-# 获取 redirect 端口
-redirectPort=$(get_port $((socks5Port+1)))
-# 获取 tprox 端口
-tproxyPort=$(get_port $((redirectPort+1)))
-
-# 输出端口
+# # 获取 redirect 端口
+# redirectPort=$(get_port $((socks5Port+1)))
+# # 获取 tprox 端口
+# tproxyPort=$(get_port $((redirectPort+1)))
 
 
 
@@ -87,6 +85,10 @@ fi
 
 
 # redirect
+# 获取 redirect 端口
+redirectPort=$(get_port $((socks5Port+1)))
+
+
 ipt2socks -s 127.0.0.1 -p ${socks5Port} -l ${redirectPort} -T -R -v > ${TEMP_PATH}/proxy-${ruleIndex}-redirect.out 2>&1 &
 
 
@@ -119,6 +121,10 @@ fi
 
 
 # tproxy
+# 获取 tprox 端口
+tproxyPort=$(get_port $((redirectPort+1)))
+
+
 ipt2socks -s 127.0.0.1 -p ${socks5Port} -l ${tproxyPort} -U -R -v > ${TEMP_PATH}/proxy-${ruleIndex}-tproxy.out 2>&1 &
 
 

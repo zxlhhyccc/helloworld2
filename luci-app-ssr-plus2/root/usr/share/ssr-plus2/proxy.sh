@@ -136,6 +136,15 @@ hysteria2)
         resultPort=""
     fi
     ;;
+anytls)
+    # AnyTLS 协议
+    if [ `command -v sing-box | wc -l` == 1 ]; then
+        resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}.sh ${ruleIndex} ${cfgid}`
+    else
+        echolog "无启动AnyTLS协议工具"
+        resultPort=""
+    fi
+    ;;
 *)
     # 默认
     resultPort=""

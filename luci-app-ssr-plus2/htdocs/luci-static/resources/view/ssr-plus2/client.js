@@ -47,7 +47,7 @@ return view.extend({
         object: 'luci-rpc',
         method: 'getHostHints',
         expect: { '': {} }
-    }), 
+    }),
     
     load: function() {
         return Promise.all([

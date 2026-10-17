@@ -99,18 +99,18 @@ kcp)
     
     
     stream_network_settings="\"kcpSettings\": {
-                                \"mtu\": ${mtu}, 
-                                \"tti\": ${tti}, 
-                                \"uplinkCapacity\": ${uplink_capacity}, 
-                                \"downlinkCapacity\": ${downlink_capacity}, 
-                                \"congestion\": ${congestion_str}, 
-                                \"readBufferSize\": ${read_buffer_size}, 
-                                \"writeBufferSize\": ${write_buffer_size}, 
-                                \"header\": {
-                                    \"type\": \"${header_type}\"
-                                }, 
-                                \"seed\": \"${seed}\"
-                             }"
+                    \"mtu\": ${mtu}, 
+                    \"tti\": ${tti}, 
+                    \"uplinkCapacity\": ${uplink_capacity}, 
+                    \"downlinkCapacity\": ${downlink_capacity}, 
+                    \"congestion\": ${congestion_str}, 
+                    \"readBufferSize\": ${read_buffer_size}, 
+                    \"writeBufferSize\": ${write_buffer_size}, 
+                    \"header\": {
+                        \"type\": \"${header_type}\"
+                    }, 
+                    \"seed\": \"${seed}\"
+                }"
     ;;
 ws)
     accept_proxy_protocol=$(uci_get_by_name ${cfgid} vmess_stream_network_ws_accep_proxy_protocol)
@@ -142,13 +142,13 @@ ws)
     
     
     stream_network_settings="\"wsSettings\": {
-                            \"acceptProxyProtocol\": ${accept_proxy_protocol_str}, 
-                            \"path\": \"${path}\", 
-                            \"headers\": ${headers}, 
-                            \"maxEarlyData\": ${max_early_data}, 
-                            \"useBrowserForwarding\": ${use_browser_forwarding_str}, 
-                            \"earlyDataHeaderName\":\"${early_data_header_name}\"
-                          }"
+                    \"acceptProxyProtocol\": ${accept_proxy_protocol_str}, 
+                    \"path\": \"${path}\", 
+                    \"headers\": ${headers}, 
+                    \"maxEarlyData\": ${max_early_data}, 
+                    \"useBrowserForwarding\": ${use_browser_forwarding_str}, 
+                    \"earlyDataHeaderName\":\"${early_data_header_name}\"
+                }"
     ;;
 http)
     host=$(uci_get_by_name ${cfgid} vmess_stream_network_http_host)
@@ -158,11 +158,11 @@ http)
     
     
     stream_network_settings="\"httpSettings\": {
-                                \"host\": ${host}, 
-                                \"path\": \"${path}\", 
-                                \"method\":\"${method}\", 
-                                \"headers\": ${headers}
-                              }"
+                    \"host\": ${host}, 
+                    \"path\": \"${path}\", 
+                    \"method\":\"${method}\", 
+                    \"headers\": ${headers}
+                }"
     ;;
 quic)
     security=$(uci_get_by_name ${cfgid} vmess_stream_network_quic_security)
@@ -170,12 +170,12 @@ quic)
     type=$(uci_get_by_name ${cfgid} vmess_stream_network_quic_headers_type)
     
     stream_network_settings="\"quicSettings\": {
-                                \"security\": \"${security}\", 
-                                \"key\": \"${key}\", 
-                                \"header\": {
-                                    \"type\": \"${type}\"
-                                 }
-                              }"
+                    \"security\": \"${security}\", 
+                    \"key\": \"${key}\", 
+                    \"header\": {
+                        \"type\": \"${type}\"
+                    }
+                }"
     ;;
 domainsocket)
     path=$(uci_get_by_name ${cfgid} vmess_stream_network_domainsocket_path)
@@ -202,17 +202,17 @@ domainsocket)
     
     
     stream_network_settings="\"dsSettings\": {
-                                \"path\": \"${path}\", 
-                                \"abstract\": ${abstract_str}, 
-                                \"padding\": ${padding_str}
-                              }"
+                    \"path\": \"${path}\", 
+                    \"abstract\": ${abstract_str}, 
+                    \"padding\": ${padding_str}
+                }"
     ;;
 grpc)
     service_name=$(uci_get_by_name ${cfgid} vmess_stream_network_grpc_service_name)
     
     stream_network_settings="\"grpcSettings\": {
-                                \"serviceName\": \"${service_name}\"
-                              }"
+                    \"serviceName\": \"${service_name}\"
+                }"
     ;;
 hysteria)
     password=$(uci_get_by_name ${cfgid} vmess_stream_network_hysteria_password)
@@ -232,21 +232,22 @@ hysteria)
     congestion_down_mbps=$(uci_get_by_name ${cfgid} vmess_stream_network_hysteria_congestion_down_mbps)
     
     stream_network_settings="\"hysteria2Settings\": {
-                                    \"password\": \"${password}\", 
-                                    \"use_udp_extension\": ${use_udp_extension_str}, 
-                                    \"congestion\": {
-                                        \"type\": \"${congestion_type}\", 
-                                        \"up_mbps\": ${congestion_up_mbps}, 
-                                        \"down_mbps\": ${congestion_down_mbps}
-                                    }
-                                }"
+                    \"password\": \"${password}\", 
+                    \"use_udp_extension\": ${use_udp_extension_str}, 
+                    \"congestion\": {
+                        \"type\": \"${congestion_type}\", 
+                        \"up_mbps\": ${congestion_up_mbps}, 
+                        \"down_mbps\": ${congestion_down_mbps}
+                    }
+                }"
     ;;
 *)
     stream_network_settings=""
 esac
 
 if [ "${stream_network_settings}" != "" ]; then
-    stream_network_settings="${stream_network_settings},"
+    stream_network_settings="
+                ${stream_network_settings},"
 fi
 
 
@@ -293,7 +294,7 @@ if [ "${stream_security}" == "tls" ]; then
     
     tls_settings="${tls_settings},  
                 \"tlsSettings\": 
-                    {
+                {
                     \"serverName\": \"${server_name}\", 
                     \"alpn\": ${alpn}, 
                     \"allowInsecure\": ${allow_insecure_str}, 
@@ -301,7 +302,7 @@ if [ "${stream_security}" == "tls" ]; then
                     \"certificates\": ${certificates},
                     \"verifyClientCertificate\": ${verify_client_certificate_str},
                     \"pinnedPeerCertificateChainSha256\": \"${pinned_peer_certificate_chain_sha256}\"
-                    }"
+                }"
 fi
 
 
@@ -310,8 +311,8 @@ fi
 socks5Port=$(get_port)
 # 获取 redirect 端口
 redirectPort=$(get_port $((socks5Port+1)))
-
-# 输出端口
+# 获取 tprox 端口
+tproxyPort=$(get_port $((redirectPort+1)))
 
 
 
@@ -323,17 +324,17 @@ cat <<-EOF > "${TEMP_PATH}/proxy-${ruleIndex}.json"
     },
     "inbounds": [
         {
-            "port": ${socks5Port},
-            "listen": "0.0.0.0",
             "protocol": "socks",
+            "listen": "0.0.0.0",
+            "port": ${socks5Port},
             "settings": {
                 "udp": true
             }
         },
         {
-            "port": ${redirectPort},
-            "listen": "0.0.0.0",
             "protocol": "dokodemo-door",
+            "listen": "0.0.0.0",
+            "port": ${redirectPort},
             "settings": {
                 "network": "tcp,udp",
                 "followRedirect": true
@@ -345,9 +346,9 @@ cat <<-EOF > "${TEMP_PATH}/proxy-${ruleIndex}.json"
             }
         },
         {
-            "port": ${redirectPort},
-            "listen": "0.0.0.0",
             "protocol": "dokodemo-door",
+            "listen": "0.0.0.0",
+            "port": ${tproxyPort},
             "settings": {
                 "network": "tcp,udp",
                 "followRedirect": true
@@ -412,5 +413,5 @@ else
     echo "${pid}" >> ${TEMP_PATH}/pid
     
     # 返回 端口
-    echo "${socks5Port},${redirectPort}"
+    echo "${socks5Port},${redirectPort},${tproxyPort}"
 fi

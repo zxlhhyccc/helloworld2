@@ -131,8 +131,6 @@ redirectPort=$(get_port $((socks5Port+1)))
 # 获取 tproxy 端口
 tproxyPort=$(get_port $((redirectPort+1)))
 
-# 输出端口
-
 
 
 # 输出配置文件

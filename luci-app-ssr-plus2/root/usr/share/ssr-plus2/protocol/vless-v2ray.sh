@@ -73,9 +73,9 @@ tcp)
     fi
     
     stream_network_settings="\"rawSettings\": {
-                                \"acceptProxyProtocol\": ${accept_proxy_protocol_str}, 
-                                \"header\": ${header}
-                              }"
+                    \"acceptProxyProtocol\": ${accept_proxy_protocol_str}, 
+                    \"header\": ${header}
+                }"
     ;;
 xhttp)
     host=$(uci_get_by_name ${cfgid} vless_stream_network_xhttp_host)
@@ -85,11 +85,11 @@ xhttp)
 
 
     stream_network_settings="\"xhttpSettings\": {
-                                \"host\": \"${host}\", 
-                                \"path\": \"${path}\",
-                                \"mode\": \"${mode}\",
-                                \"extra\": ${extra}
-                              }"
+                    \"host\": \"${host}\", 
+                    \"path\": \"${path}\",
+                    \"mode\": \"${mode}\",
+                    \"extra\": ${extra}
+                }"
     ;;
 kcp)
     mtu=$(uci_get_by_name ${cfgid} vless_stream_network_kcp_mtu 1350)
@@ -111,14 +111,14 @@ kcp)
     
     
     stream_network_settings="\"kcpSettings\": {
-                                \"mtu\": ${mtu},
-                                \"tti\": ${tti},
-                                \"uplinkCapacity\": ${uplink_capacity},
-                                \"downlinkCapacity\": ${downlink_capacity},
-                                \"congestion\": ${congestion_str},
-                                \"readBufferSize\": ${read_buffer_size},
-                                \"writeBufferSize\": ${write_buffer_size}
-                             }"
+                    \"mtu\": ${mtu},
+                    \"tti\": ${tti},
+                    \"uplinkCapacity\": ${uplink_capacity},
+                    \"downlinkCapacity\": ${downlink_capacity},
+                    \"congestion\": ${congestion_str},
+                    \"readBufferSize\": ${read_buffer_size},
+                    \"writeBufferSize\": ${write_buffer_size}
+                }"
     ;;
 ws)
     accept_proxy_protocol=$(uci_get_by_name ${cfgid} vless_stream_network_ws_accep_proxy_protocol)
@@ -139,12 +139,12 @@ ws)
     
     
     stream_network_settings="\"wsSettings\": {
-                            \"acceptProxyProtocol\": ${accept_proxy_protocol_str},
-                            \"path\": \"${path}\",
-                            \"host\": \"${host}\",
-                            \"headers\": ${headers},
-                            \"heartbeatPeriod\": ${heartbeat_period}
-                          }"
+                    \"acceptProxyProtocol\": ${accept_proxy_protocol_str},
+                    \"path\": \"${path}\",
+                    \"host\": \"${host}\",
+                    \"headers\": ${headers},
+                    \"heartbeatPeriod\": ${heartbeat_period}
+                }"
     ;;
 grpc)
     authority=$(uci_get_by_name ${cfgid} vless_stream_network_grpc_authority)
@@ -176,15 +176,15 @@ grpc)
     
     
     stream_network_settings="\"grpcSettings\": {
-                              \"authority\": \"${authority}\",
-                              \"serviceName\": \"${service_name}\",
-                              \"multiMode\": ${multi_mode_str},
-                              \"user_agent\": \"${user_agent}\",
-                              \"idle_timeout\": ${idle_timeout},
-                              \"health_check_timeout\": ${health_check_timeout},
-                              \"permit_without_stream\": ${permit_without_stream_str},
-                              \"initial_windows_size\": ${initial_windows_size}
-                            }"
+                    \"authority\": \"${authority}\",
+                    \"serviceName\": \"${service_name}\",
+                    \"multiMode\": ${multi_mode_str},
+                    \"user_agent\": \"${user_agent}\",
+                    \"idle_timeout\": ${idle_timeout},
+                    \"health_check_timeout\": ${health_check_timeout},
+                    \"permit_without_stream\": ${permit_without_stream_str},
+                    \"initial_windows_size\": ${initial_windows_size}
+                }"
     ;;
 httpupgrade)
     accept_proxy_protocol=$(uci_get_by_name ${cfgid} vless_stream_network_ws_accep_proxy_protocol)
@@ -202,11 +202,11 @@ httpupgrade)
     
     
     stream_network_settings="\"httpupgradeSettings\": {
-                                \"acceptProxyProtocol\": ${accept_proxy_protocol_str}, 
-                                \"host\": ${host}, 
-                                \"path\": \"${path}\", 
-                                \"headers\": ${headers}
-                              }"
+                    \"acceptProxyProtocol\": ${accept_proxy_protocol_str}, 
+                    \"host\": ${host}, 
+                    \"path\": \"${path}\", 
+                    \"headers\": ${headers}
+                }"
     ;;
 hysteria)
     version=$(uci_get_by_name ${cfgid} vless_stream_network_hysteria_version)
@@ -250,29 +250,30 @@ hysteria)
     
     
     stream_network_settings="\"hysteriaSettings\": {
-                                  \"version\": 2,
-                                  \"auth\": \"${auth}\",
-                                  \"up\": \"${up}\",
-                                  \"down\": \"${down}\",
-                                  \"udphop\": {
-                                    \"port\": \"${udphop_port}\",
-                                    \"interval\": ${udphop_interval}
-                                  },
-                                  ${init_stream_receive_window}
-                                  ${max_stream_receive_window}
-                                  ${init_connection_receive_window}
-                                  ${max_connection_receive_window}
-                                  \"maxIdleTimeout\": ${max_idle_timeout},
-                                  \"keepAlivePeriod\": ${keep_alive_period},
-                                  \"disablePathMTUDiscovery\": ${disable_path_mtu_discovery_str}
-                                }"
+                    \"version\": 2,
+                    \"auth\": \"${auth}\",
+                    \"up\": \"${up}\",
+                    \"down\": \"${down}\",
+                    \"udphop\": {
+                        \"port\": \"${udphop_port}\",
+                        \"interval\": ${udphop_interval}
+                    },
+                    ${init_stream_receive_window}
+                    ${max_stream_receive_window}
+                    ${init_connection_receive_window}
+                    ${max_connection_receive_window}
+                    \"maxIdleTimeout\": ${max_idle_timeout},
+                    \"keepAlivePeriod\": ${keep_alive_period},
+                    \"disablePathMTUDiscovery\": ${disable_path_mtu_discovery_str}
+                }"
     ;;
 *)
     stream_network_settings=""
 esac
 
 if [ "${stream_network_settings}" != "" ]; then
-    stream_network_settings="${stream_network_settings},"
+    stream_network_settings="
+                ${stream_network_settings},"
 fi
 
 
@@ -341,26 +342,25 @@ if [ "${stream_security}" == "tls" ]; then
     
     tls_settings=",
                 \"tlsSettings\": 
-                 {
-                  \"serverName\": \"${server_name}\",
-                  \"verifyPeerCertByName\": \"${verify_peer_cert_by_name}\",
-                  \"rejectUnknownSni\": ${vless_stream_tls_reject_unknown_sni_str},
-                  \"allowInsecure\": ${allow_insecure_str},
-                  \"alpn\": ${alpn},
-                  \"minVersion\": \"${min_version}\",
-                  \"maxVersion\": \"${max_version}\",
-                  \"cipherSuites\": \"${cipher_suites}\",
-                  \"certificates\": ${certificates},
-                  \"disableSystemRoot\": ${disable_system_root_str},
-                  \"enableSessionResumption\": ${enable_ssession_resumption_str},
-                  \"fingerprint\": \"${fingerprint}\",
-                  \"pinnedPeerCertSha256\": \"${pinned_peer_cert_sha256}\",
-                  \"curvePreferences\": ${curve_preferences},
-                  \"masterKeyLog\": \"${master_key_log}\",
-                  \"echServerKeys\": \"${ech_server_keys}\",
-                  \"echConfigList\": \"${ech_config_list}\",
-                  \"echForceQuery\": \"${ech_force_query}\",
-                  \"echSockopt\": ${fingerprint}
+                {
+                    \"serverName\": \"${server_name}\",
+                    \"verifyPeerCertByName\": \"${verify_peer_cert_by_name}\",
+                    \"rejectUnknownSni\": ${vless_stream_tls_reject_unknown_sni_str},
+                    \"allowInsecure\": ${allow_insecure_str},
+                    \"alpn\": ${alpn},
+                    \"minVersion\": \"${min_version}\",
+                    \"maxVersion\": \"${max_version}\",
+                    \"cipherSuites\": \"${cipher_suites}\",
+                    \"certificates\": ${certificates},
+                    \"disableSystemRoot\": ${disable_system_root_str},
+                    \"enableSessionResumption\": ${enable_ssession_resumption_str},
+                    \"fingerprint\": \"${fingerprint}\",
+                    \"pinnedPeerCertSha256\": \"${pinned_peer_cert_sha256}\",
+                    \"curvePreferences\": ${curve_preferences},
+                    \"masterKeyLog\": \"${master_key_log}\",
+                    \"echServerKeys\": \"${ech_server_keys}\",
+                    \"echConfigList\": \"${ech_config_list}\",
+                    \"echForceQuery\": \"${ech_force_query}\"
                 }"
 fi
 
@@ -399,43 +399,43 @@ if [ "${stream_security}" == "reality" ]; then
     spider_x=$(uci_get_by_name ${cfgid} vless_stream_reality_spider_x)
     
     reality_settings=",
-            \"realitySettings\": 
-             {
-              \"show\": ${show_str},
-              // \"target\": \"${target}\",
-              \"xver\": ${xver},
-              \"serverNames\": ${server_names},
-              \"privateKey\": \"${private_key}\",
-              \"minClientVer\": \"${min_client_ver}\",
-              \"maxClientVer\": \"${max_client_ver}\",
-              \"maxTimeDiff\": ${max_time_diff},
-              \"shortIds\": ${short_ids},
-              \"mldsa65Seed\": \"${mldsa65Seed}\",
-              \"limitFallbackUpload\": {
-                \"afterBytes\": ${limit_fallback_upload_after_bytes},
-                \"bytesPerSec\": ${limit_fallback_upload_bytes_per_sec},
-                \"burstBytesPerSec\": ${limit_fallback_upload_burst_bytes_per_sec}
-              },
-              \"limitFallbackDownload\": {
-                \"afterBytes\": ${limit_fallback_download_after_bytes},
-                \"bytesPerSec\": ${limit_fallback_download_bytes_per_sec},
-                \"burstBytesPerSec\": ${limit_fallback_download_burst_bytes_per_sec}
-              },
-              \"fingerprint\": \"${fingerprint}\",
-              \"serverName\": \"${server_name}\",
-              \"password\": \"${password}\",
-              \"shortId\": \"${short_id}\",
-              \"mldsa65Verify\": \"${mldsa65_verify}\",
-              \"spiderX\": \"${spider_x}\"
-            }"
+                \"realitySettings\": 
+                 {
+                    \"show\": ${show_str},
+                    // \"target\": \"${target}\",
+                    \"xver\": ${xver},
+                    \"serverNames\": ${server_names},
+                    \"privateKey\": \"${private_key}\",
+                    \"minClientVer\": \"${min_client_ver}\",
+                    \"maxClientVer\": \"${max_client_ver}\",
+                    \"maxTimeDiff\": ${max_time_diff},
+                    \"shortIds\": ${short_ids},
+                    \"mldsa65Seed\": \"${mldsa65Seed}\",
+                    \"limitFallbackUpload\": {
+                        \"afterBytes\": ${limit_fallback_upload_after_bytes},
+                        \"bytesPerSec\": ${limit_fallback_upload_bytes_per_sec},
+                        \"burstBytesPerSec\": ${limit_fallback_upload_burst_bytes_per_sec}
+                    },
+                    \"limitFallbackDownload\": {
+                        \"afterBytes\": ${limit_fallback_download_after_bytes},
+                        \"bytesPerSec\": ${limit_fallback_download_bytes_per_sec},
+                        \"burstBytesPerSec\": ${limit_fallback_download_burst_bytes_per_sec}
+                    },
+                    \"fingerprint\": \"${fingerprint}\",
+                    \"serverName\": \"${server_name}\",
+                    \"password\": \"${password}\",
+                    \"shortId\": \"${short_id}\",
+                    \"mldsa65Verify\": \"${mldsa65_verify}\",
+                    \"spiderX\": \"${spider_x}\"
+                }"
 fi
 
 # 获取 socks5 端口
 socks5Port=$(get_port)
 # 获取 redirect 端口
 redirectPort=$(get_port $((socks5Port+1)))
-
-# 输出端口
+# 获取 tprox 端口
+tproxyPort=$(get_port $((redirectPort+1)))
 
 
 
@@ -447,17 +447,17 @@ cat <<-EOF > "${TEMP_PATH}/proxy-${ruleIndex}.json"
     },
     "inbounds": [
         {
-            "port": ${socks5Port},
-            "listen": "0.0.0.0",
             "protocol": "socks",
+            "listen": "0.0.0.0",
+            "port": ${socks5Port},
             "settings": {
                 "udp": true
             }
         },
         {
-            "port": ${redirectPort},
-            "listen": "0.0.0.0",
             "protocol": "dokodemo-door",
+            "listen": "0.0.0.0",
+            "port": ${redirectPort},
             "settings": {
                 "network": "tcp,udp",
                 "followRedirect": true
@@ -469,9 +469,9 @@ cat <<-EOF > "${TEMP_PATH}/proxy-${ruleIndex}.json"
             }
         },
         {
-            "port": ${redirectPort},
-            "listen": "0.0.0.0",
             "protocol": "dokodemo-door",
+            "listen": "0.0.0.0",
+            "port": ${tproxyPort},
             "settings": {
                 "network": "tcp,udp",
                 "followRedirect": true
@@ -502,8 +502,7 @@ cat <<-EOF > "${TEMP_PATH}/proxy-${ruleIndex}.json"
                 ]
             },
             "streamSettings": {
-                "network": "${stream_network}",
-                ${stream_network_settings}
+                "network": "${stream_network}",${stream_network_settings}
                 "security": "${stream_security}"${tls_settings}${reality_settings}
             }
         }
@@ -536,5 +535,5 @@ else
     echo "${pid}" >> ${TEMP_PATH}/pid
     
     # 返回 端口
-    echo "${socks5Port},${redirectPort}"
+    echo "${socks5Port},${redirectPort},${tproxyPort}"
 fi

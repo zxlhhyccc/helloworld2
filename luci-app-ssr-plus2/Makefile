@@ -21,14 +21,15 @@ PKG_RELEASE:=1
 #     CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Tuic_Client \
 #     CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Shadow_TLS \
 #     CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Hysteria2 \
+#     CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Sing_Box \
 #     CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Simple_Obfs \
 #     CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_V2ray_Plugin \
 #     CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Xray_Plugin
-    
 
 
 
-LUCI_TITLE:=Socks5/SS/SSR/Vmess/Trojan/NaiveProxy/Vless/Hysteria/Tuic/ShadowTLS LuCI interface
+
+LUCI_TITLE:=Socks5/SS/SSR/Vmess/Trojan/NaiveProxy/Vless/Hysteria/Tuic/ShadowTLS/AnyTLS LuCI interface
 LUCI_PKGARCH:=all
 LUCI_DEPENDS:= \
     +coreutils +coreutils-base64 +curl \
@@ -48,6 +49,7 @@ LUCI_DEPENDS:= \
     +PACKAGE_$(PKG_NAME)_INCLUDE_Tuic_Client:tuic-client \
     +PACKAGE_$(PKG_NAME)_INCLUDE_Shadow_TLS:shadow-tls \
     +PACKAGE_$(PKG_NAME)_INCLUDE_Hysteria2:hysteria2 \
+    +PACKAGE_$(PKG_NAME)_INCLUDE_Sing_Box:sing-box \
     +PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Simple_Obfs:simple-obfs-client \
     +PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_V2ray_Plugin:v2ray-plugin \
     +PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Xray_Plugin:xray-plugin
@@ -146,6 +148,11 @@ config PACKAGE_$(PKG_NAME)_INCLUDE_Shadow_TLS
 
 config PACKAGE_$(PKG_NAME)_INCLUDE_Hysteria2
     bool "Include Hysteria2"
+    default n
+
+
+config PACKAGE_$(PKG_NAME)_INCLUDE_Sing_Box
+    bool "Include Sing-Box"
     default n
 
 

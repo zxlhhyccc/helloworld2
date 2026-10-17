@@ -65,8 +65,6 @@ socks5Port=$(get_port)
 # 获取 redirect 端口
 redirectPort=$(get_port $((socks5Port+1)))
 
-# 输出端口
-
 
 
 # 输出配置文件

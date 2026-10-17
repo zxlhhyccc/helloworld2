@@ -422,7 +422,7 @@ var viewExtend = view.extend({
         // 删除所有订阅服务器节点
         option = section.option(form.Button, "", _("Delete All Subscribe Servers"), _("Server Count") + '<span id=node_number>' + uci.sections(PACKAGE_NAME, 'node').length || 0 + '</span>');
         // 样式
-        option.inputstyle = "reset"; 
+        option.inputstyle = "reset";
         // 自定义事件
         option.onclick = function(ev, section_id) {
             // 删除 订阅配置
@@ -767,6 +767,8 @@ function createNodeInfo(section, groupHash) {
     // option.value('shadowtls', _('ShadowTLS'));
     // Hysteria2
     option.value('hysteria2', _('Hysteria2'));
+    // Hysteria2
+    option.value('anytls', _('AnyTLS'));
     
 
 
@@ -897,6 +899,7 @@ function createNodeInfo(section, groupHash) {
     option.depends("protocol", "tuic");
     option.depends("protocol", "shadowtls");
     option.depends("protocol", "hysteria2");
+    option.depends("protocol", "anytls");
 
 
 
@@ -956,7 +959,13 @@ function createNodeInfo(section, groupHash) {
     // ============================ hysteria2  start
     hysteria2NodeInfo(section);
     // ============================ hysteria2  end
+
     
+    
+    // ============================ anytls  start
+    anytlsNodeInfo(section);
+    // ============================ anytls  end
+
     
     // TCP 快速打开
     option = section.option(form.Flag, "fast_open", _("TCP Fast Open"), _("Enabling TCP Fast Open Requires Server Support."));
@@ -2555,11 +2564,63 @@ function hysteria2NodeInfo(section) {
     option.modalonly = true;
     // 依赖
     option.depends("hysteria2_obfs", "1");
-    
-    
-    
+
+
+
 }
 
+
+// anytls 节点信息
+function anytlsNodeInfo(section) {
+    var option;
+
+    // 空闲会话检查间隔
+    option = section.option(form.Value, "anytls_idle_session_check_interval", _("idle_session_check_interval"));
+    // 只展示在弹出框
+    option.modalonly = true;
+    // 依赖
+    option.depends("protocol", "anytls");    
+
+
+    // 空闲会话超时时间
+    option = section.option(form.Value, "anytls_idle_session_timeout", _("idle_session_timeout"));
+    // 只展示在弹出框
+    option.modalonly = true;
+    // 依赖
+    option.depends("protocol", "anytls");
+
+
+    // 最小空闲会话数
+    option = section.option(form.Value, "anytls_min_idle_session", _("min_idle_session"));
+    // 只展示在弹出框
+    option.modalonly = true;
+    // 依赖
+    option.depends("protocol", "anytls");
+
+
+    // 
+    option = section.option(form.Value, "anytls_server_name", _("Server Name"));
+    // 只展示在弹出框
+    option.modalonly = true;
+    // 依赖
+    option.depends("protocol", "anytls");
+
+
+    // Allow Insecure
+    option = section.option(form.Flag, "anytls_allow_insecure", _("Allow Insecure"));
+    // 只展示在弹出框
+    option.modalonly = true;
+    // 依赖
+    option.depends("protocol", "anytls");
+
+
+    // 
+    option = section.option(form.Value, "anytls_client_metadata", _("Client Metadata"));
+    // 只展示在弹出框
+    option.modalonly = true;
+    // 依赖
+    option.depends("protocol", "anytls");
+}
 
 // 导入链接
 // 返回true:导入成功;否则返回错误描述
@@ -2611,6 +2672,9 @@ function importUri(section_id, uri, groupHash) {
         case "hy2":
         case "hysteria2":
             importResult = importHysteria2(section_id, arr[1], groupHash);
+            break;
+        case "anytls":
+            importResult = importAnyTLS(section_id, arr[1], groupHash);
             break;
         default:
             // 错误格式
@@ -3508,6 +3572,66 @@ function importHysteria2(section_id, rawUrl, groupHash) {
     return true;
 }
 
+
+// 导入 AnyTLS 节点
+function importAnyTLS(section_id, rawUrl, groupHash) {
+    // 节点数据
+    var nodeData = {};
+    // 临时变量
+    var url, params;
+    
+    
+    try {
+        url = new URL("http://" + rawUrl);
+        params = url.searchParams;
+    } catch(e) {
+        return;
+    }
+
+
+    // 值
+    // 协议类型
+    nodeData['protocol'] = 'anytls';
+    // 别名
+    nodeData['alias'] = url.hash ? decodeURIComponent(url.hash.slice(1)) : "";
+    var filterResult =  filterAlias(nodeData['alias']); if (filterResult) { return filterResult; }
+    // 地址
+    nodeData['server'] = parseServer(url.hostname);
+    // 端口
+    nodeData['server_port'] = url.port || "443";
+
+    // 密码
+    nodeData['password'] = decodeURIComponent(url.username);
+
+
+    // 空闲会话检查间隔
+    nodeData['anytls_idle_session_check_interval'] = params.get("idle_session_check_interval");
+    
+    // 空闲会话超时时间
+    nodeData['anytls_idle_session_timeout'] = params.get("idle_session_timeout");
+    
+    // 最小空闲会话数
+    nodeData['anytls_min_idle_session'] = params.get("min_idle_session");
+
+    // ServerName
+    nodeData['anytls_server_name'] = params.get("sni") || "";
+
+    var allowInsecureValue = params.get("allowInsecure") || params.get("insecure");
+    allowInsecureValue = convertToCheckBoxValue(allowInsecureValue);
+    nodeData['anytls_allow_insecure'] = allowInsecureValue;
+    
+    nodeData['anytls_client_metadata'] = params.get("client_metadata") || "";
+    if (groupHash) {
+        // 有分组 hash
+        nodeData['group_hash'] = groupHash;
+    }
+    
+    // 更新数据
+    updateNodeData(section_id, nodeData);
+    
+    // 返回成功
+    return true;
+}
 
 // 名称过滤 错误描述 需要删除 null 保留
 function filterAlias(alias) {
