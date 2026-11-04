@@ -162,6 +162,8 @@ anytls)
     # AnyTLS 协议
     if [ `command -v sing-box | wc -l` == 1 ]; then
         resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-sing-box.sh ${ruleIndex} ${cfgid}`
+    elif [ `command -v xray | wc -l` == 1 ]; then
+        resultPort=`sh /usr/share/ssr-plus2/protocol/${protocol}-xray.sh ${ruleIndex} ${cfgid}`
     else
         echolog "无启动AnyTLS协议工具"
         resultPort=""

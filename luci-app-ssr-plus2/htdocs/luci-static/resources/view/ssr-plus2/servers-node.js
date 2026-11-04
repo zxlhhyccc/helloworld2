@@ -185,8 +185,13 @@ var importClickFunction = function (section_id, ev) {
     }
 };
 
-// 显示延迟
-function latencyShow(section_id, latency) {
+/**
+ * 显示延迟
+ * @param section_id
+ * @param latencyCheck 是否从延迟检测按钮触发(所有检测)
+ * @param latency
+ */
+function latencyShow(section_id, latencyCheck, latency) {
     // tr
     var trEl = document.getElementById('cbi-%s-%s'.format(PACKAGE_NAME, section_id));
     // 获取 子元素
@@ -203,6 +208,10 @@ function latencyShow(section_id, latency) {
                 if (latency < 100) col = '#249400';
             }
             children.innerHTML = `<font style=\"color:${col}\">${(latency ? latency : "--") + " s"}</font>`;
+        }
+        if (latencyCheck && (children.dataset.name === 'check')) {
+            // 延迟检测按钮 触发 完成事件
+            children.getElementsByTagName("button")[0].dispatchEvent(new Event('clickComplete'));
         }
     }
 }
@@ -456,6 +465,7 @@ var viewExtend = view.extend({
         option.inputstyle = "apply";
         // 自定义事件
         option.onclick = function(ev, section_id) {
+            var task = [];
             // 获取 表格
             const activePane = document.getElementById(globalThis.subscribeActivePaneId);
             if (activePane) {
@@ -470,15 +480,34 @@ var viewExtend = view.extend({
                             if (children.dataset.name === 'check') {
                                 // 延迟 检测 按钮
                                 const checkButton = children.querySelector("button");
-                                if (checkButton) {
-                                    // 触发事件
-                                    setTimeout(() => checkButton.dispatchEvent(new Event('click')), 1000 * index)
+                                if (checkButton && !checkButton.disabled) {
+                                    // 存在按钮 且当前没有在执行 触发事件
+                                    // 使用 异步任务
+                                    task.push(new Promise((resolve) => {
+                                        // 使用 自定义 事件名称 在 latencyShow方法 会触发
+                                        checkButton.addEventListener('clickComplete', (event) => {
+                                            resolve(event);
+                                        }/* , {once: true}*/);
+                                    }));
+                                    // 延迟 触发
+                                    setTimeout(() => {
+                                        // 再次判断 防止 手动点击检测
+                                        if (checkButton.disabled) {
+                                            // 已经 检测中 主动发送完成事件
+                                            checkButton.dispatchEvent(new Event('clickComplete'));
+                                        } else {
+                                            checkButton.dispatchEvent(new CustomEvent('click', {detail: {latencyCheck: true}}));
+                                        }
+                                    }, 3000 * (index - 1));
                                 }
                             }
                         }
                     });
                 }
             }
+
+            // 返回
+            return Promise.all(task);
         }
 
 
@@ -746,10 +775,10 @@ var viewExtend = view.extend({
             //     // console.log(data)
             //     var latency = (data[0] || '').trim();
             //     // 显示延迟
-            //     latencyShow(section_id, latency);
+            //     latencyShow(section_id, false, latency);
             // }, this, section_id)).catch(L.bind(function(section_id, e) {
             //     // 显示延迟
-            //     latencyShow(section_id);
+            //     latencyShow(section_id, false);
             // }, this, section_id));
 
             return "";
@@ -766,16 +795,16 @@ var viewExtend = view.extend({
         option.editable = true;
         // 自定义事件
         option.onclick = function (ev, section_id) {
-            return globalThis.callFileExec('/etc/init.d/ssr-plus2', ['latency', section_id]).then(L.bind(function (section_id, data) {
+            return globalThis.callFileExec('/etc/init.d/ssr-plus2', ['latency', section_id]).then(L.bind(function (section_id, latencyCheck, data) {
                 // console.log(section_id)
                 // console.log(data)
                 var latency = (data.stdout || '').trim();
                 // 显示延迟
-                latencyShow(section_id, latency);
-            }, this, section_id)).catch(L.bind(function (section_id, e) {
+                latencyShow(section_id, latencyCheck, latency);
+            }, this, section_id, ev.detail.latencyCheck || false)).catch(L.bind(function (section_id, latencyCheck, e) {
                 // 显示延迟
-                latencyShow(section_id);
-            }, this, section_id));
+                latencyShow(section_id,latencyCheck);
+            }, this, section_id, ev.detail.latencyCheck || false));
         }
 
 

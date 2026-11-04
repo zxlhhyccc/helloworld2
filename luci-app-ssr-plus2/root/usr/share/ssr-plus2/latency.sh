@@ -42,6 +42,9 @@ fi
 # socks5 端口
 socks5Port=`echo -n "${resultPort}" | awk -F ',' '{print $1}'`
 
+# 休眠 让程序启动好 
+sleep 3
+
 # 执行测试
 time_total=`curl -x socks5h://127.0.0.1:${socks5Port} --connect-timeout 5 --max-time 5 --retry 2 -o /dev/null -s -w '%{time_total}' https://www.google.com/`
 # 命令执行结果
@@ -53,7 +56,7 @@ if [ -f "${PID_FILE}" ]; then
     # 关闭 进程
     for line in $(cat ${PID_FILE}); do kill ${line} 2>/dev/null; done
 
-    # 休息 1秒
+    # 休眠 让程序关闭
     sleep 1
 fi
 # 删除目录

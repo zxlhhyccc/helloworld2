@@ -22,7 +22,7 @@ server_port=$(uci_get_by_name ${cfgid} server_port)
 # 密码
 password=$(uci_get_by_name ${cfgid} password)
 
-tls_settings=""
+stream_settings=""
 # TLS
 tls=$(uci_get_by_name ${cfgid} trojan_tls)
 if [ "${tls}" == "1" ]; then
@@ -36,7 +36,7 @@ if [ "${tls}" == "1" ]; then
         # 允许 不安全链接
         verify=true
     fi
-    tls_settings=",
+    stream_settings=",
             \"streamSettings\": {
                 \"tlsSettings\": {
                     \"serverName\": \"${tls_sni}\",
@@ -123,7 +123,7 @@ cat <<-EOF > "${TEMP_PATH}/proxy-${ruleIndex}.json"
                         "password": "${password}"
                     }
                 ]
-            }${tls_settings}
+            }${stream_settings}
         }
     ]
 }

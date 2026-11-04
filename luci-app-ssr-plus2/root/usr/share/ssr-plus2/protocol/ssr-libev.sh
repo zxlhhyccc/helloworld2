@@ -95,7 +95,7 @@ EOF
 
 # 启动程序
 # socks5
-ssr-local -c ${TEMP_PATH}/proxy-${ruleIndex}-socks5.json > ${TEMP_PATH}/proxy-${ruleIndex}-socks5.out 2>&1 &
+ssr-local -v -c ${TEMP_PATH}/proxy-${ruleIndex}-socks5.json > ${TEMP_PATH}/proxy-${ruleIndex}-socks5.out 2>&1 &
 
 # 进程号
 pid=$!
