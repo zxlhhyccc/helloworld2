@@ -1,12 +1,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=xray-core
-PKG_VERSION:=26.10.21
-PKG_RELEASE:=2
+PKG_VERSION:=26.10.31
+PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/XTLS/Xray-core/tar.gz/v$(PKG_VERSION)?
-PKG_HASH:=44ef4874529a03848c90f1fdcfb763350fbc5f1de741ec90e0024d651df25650
+PKG_HASH:=be44f95d497ad4ba6e9d1dcfbbd71e8e51f812aff077d4c15c9947eff5e3046a
 
 PKG_MAINTAINER:=Tianling Shen <cnsztl@immortalwrt.org>
 PKG_LICENSE:=MPL-2.0 GPL-3.0-or-later MIT
@@ -68,6 +68,14 @@ ifeq ($(GO_ARCH),arm64)
   endef
 endif
 
+# Compress once per build, not once per package/rootfs installation.
+# Keep Go's output intact and let the .built stamp guard the packed copy.
+define Build/Install
+	$(INSTALL_DIR) $(PKG_BUILD_DIR)/.upx
+	$(INSTALL_BIN) $(GO_PKG_BUILD_BIN_DIR)/main $(PKG_BUILD_DIR)/.upx/xray
+	$(STAGING_DIR_HOST)/bin/upx --lzma --best $(PKG_BUILD_DIR)/.upx/xray
+endef
+
 # Go's -s -w flags strip the binary before UPX; do not strip it again.
 RSTRIP:=:
 
@@ -99,10 +107,8 @@ define Package/xray-core/description
 endef
 
 define Package/xray-core/install
-	$(call GoPackage/Package/Install/Bin,$(PKG_INSTALL_DIR))
-	$(INSTALL_DIR) $(1)/usr/bin/
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/main $(1)/usr/bin/xray
-	$(STAGING_DIR_HOST)/bin/upx --lzma --best $(1)/usr/bin/xray
+	$(INSTALL_DIR) $(1)/usr/bin
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.upx/xray $(1)/usr/bin/xray
 endef
 
 $(eval $(call BuildPackage,xray-core))
