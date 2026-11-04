@@ -5,13 +5,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=naiveproxy
-PKG_REAL_VERSION:=147.0.7727.49-1
+PKG_REAL_VERSION:=154.0.8037.49-5
 PKG_VERSION:=$(subst -,.,$(PKG_REAL_VERSION))
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_REAL_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/klzgrad/naiveproxy/tar.gz/v$(PKG_REAL_VERSION)?
-PKG_HASH:=5102b57a25ee88509634c0e4b7e7c47c6128b10b4d1630c4ab9ded639105630a
+PKG_HASH:=945e89a43e38e15baf16a5d8489c55c47c325b5c9a86f2ee082ce688d0cee4eb
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_REAL_VERSION)
 
 PKG_LICENSE:=BSD 3-Clause
@@ -41,7 +41,7 @@ define Package/naiveproxy
   SUBMENU:=Web Servers/Proxies
   TITLE:=Make a fortune quietly
   URL:=https://github.com/klzgrad/naiveproxy
-  DEPENDS:=@!(arc||armeb||loongarch64||mips||mips64||powerpc||TARGET_gemini) +libatomic
+  DEPENDS:=@!(arc||armeb||mips||mips64||powerpc||TARGET_gemini) +libatomic
 endef
 
 define Package/naiveproxy/description
@@ -57,22 +57,22 @@ ifneq ($(CONFIG_CCACHE),)
   export naive_ccache_flags=cc_wrapper="$(CCACHE)"
 endif
 
-CLANG_VER:=23-init-5669-g8a0be0bc-1
+CLANG_VER:=24-init-3796-g20e97c4b-27
 CLANG_FILE:=clang-llvmorg-$(CLANG_VER).tar.xz
 define Download/CLANG
 	URL:=https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64
 	URL_FILE:=$(CLANG_FILE)
 	FILE:=$(CLANG_FILE)
-	HASH:=750b331006635281d7d90696629f67db748ba62004c46675eccb8af144141847
+	HASH:=968195fa0b49958e066695df2c7c985d169a20fa06eedb8fcef900a6030edcb0
 endef
 
-PGO_VER:=7727-1774978896-38e5deba67117246fc20e2afbaafb6ff138882a3-3f44451a3565db8934451c0ce67293ed93a78b74
+PGO_VER:=8037-1789495081-7feb9cdd3829d739633f8ac2c1a41d6c0f693bd3-9272cb3a6934b0e4510fb1cde78ca7e9d7859922
 PGO_FILE:=chrome-linux-$(PGO_VER).profdata
 define Download/PGO_PROF
 	URL:=https://storage.googleapis.com/chromium-optimization-profiles/pgo_profiles
 	URL_FILE:=$(PGO_FILE)
 	FILE:=$(PGO_FILE)
-	HASH:=f37730feed6ce1abec80e58cc5198300b53e4e66bbcdc0fe63c73bb441a07c03
+	HASH:=1e1f79dc4b6de72bccfbc2e67498e75ce60c4b53c10bceb0559c358596cd71a2
 endef
 
 define Build/Prepare
