@@ -1,12 +1,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=xray-core
-PKG_VERSION:=26.10.31
-PKG_RELEASE:=1
+PKG_VERSION:=26.11.9
+PKG_RELEASE:=2
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/XTLS/Xray-core/tar.gz/v$(PKG_VERSION)?
-PKG_HASH:=be44f95d497ad4ba6e9d1dcfbbd71e8e51f812aff077d4c15c9947eff5e3046a
+PKG_HASH:=d5a47bed1b85e1cdfe3cb2f88a02e2db7144f0f8bee541d20b84fafa8fdf6c8d
 
 PKG_MAINTAINER:=Tianling Shen <cnsztl@immortalwrt.org>
 PKG_LICENSE:=MPL-2.0 GPL-3.0-or-later MIT
@@ -37,6 +37,8 @@ CRONET_CLANG_DIR:=$(PKG_BUILD_DIR)/.cronet-clang
 
 ifeq ($(CONFIG_XRAY_CORE_NAIVE),y)
   GO_PKG_TAGS+=with_naive_outbound
+  # Cronet selects its static archive by filename, which cgo rejects by default.
+  GO_PKG_VARS+=CGO_LDFLAGS_ALLOW='-l:libcronet[.]a'
   ifeq ($(CONFIG_USE_MUSL),y)
     GO_PKG_TAGS+=with_musl
   endif
@@ -44,15 +46,21 @@ ifeq ($(CONFIG_XRAY_CORE_NAIVE),y)
   # CGO_LDFLAGS. Select LLD here so the SDK cannot override it with ld.bfd.
   TARGET_LDFLAGS:=$(filter-out -fuse-ld=%,$(TARGET_LDFLAGS)) -B$(CRONET_CLANG_DIR)/bin -fuse-ld=lld $(if $(filter arm i386 mipsel loongarch64,$(ARCH)),-Wl$(comma)-no-pie) $(if $(filter loongarch64,$(ARCH)),-Wl$(comma)--no-relax)
 
-  define Download/cronet-clang
-    URL:=https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64
-    URL_FILE:=$(CRONET_CLANG_FILE)
-    FILE:=$(CRONET_CLANG_FILE)
-    HASH:=968195fa0b49958e066695df2c7c985d169a20fa06eedb8fcef900a6030edcb0
-  endef
-  $(eval $(call Download,cronet-clang))
+  ifeq ($(HOST_OS)-$(HOST_ARCH),Linux-x86_64)
+    define Download/cronet-clang
+      URL:=https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64
+      URL_FILE:=$(CRONET_CLANG_FILE)
+      FILE:=$(CRONET_CLANG_FILE)
+      HASH:=968195fa0b49958e066695df2c7c985d169a20fa06eedb8fcef900a6030edcb0
+    endef
+    $(eval $(call Download,cronet-clang))
+  endif
 
   define Build/Prepare
+	@if [ "$(HOST_OS)-$(HOST_ARCH)" != "Linux-x86_64" ]; then \
+		echo "xray-core: Naive outbound requires a Linux x86_64 build host; disable CONFIG_XRAY_CORE_NAIVE on this host." >&2; \
+		exit 1; \
+	fi
 	$(call Build/Prepare/Default)
 	$(INSTALL_DIR) $(CRONET_CLANG_DIR)
 	$(TAR) -xJf $(DL_DIR)/$(CRONET_CLANG_FILE) -C $(CRONET_CLANG_DIR)
@@ -94,10 +102,11 @@ define Package/xray-core/config
     depends on (aarch64 || arm || i386 || x86_64 || mipsel || riscv64 || loongarch64)
     depends on (USE_MUSL || USE_GLIBC)
     depends on !arm || (arm_v7 && HAS_FPU)
-    default y
+    default $(if $(filter Linux-x86_64,$(HOST_OS)-$(HOST_ARCH)),y,n)
     help
       Link Chromium/Cronet for NaiveProxy HTTP/2 and HTTP/3 outbounds.
       Requires an x86_64 Linux build host and adds a native library to Xray.
+      Disabled by default on other build hosts, including ARM and ARM64.
       Naive inbound support remains available when this option is disabled.
 endef
 
