@@ -25,6 +25,12 @@ export TEMP_PATH=/tmp/ssr-plus2/latency/${cfgid}
 # pid文件
 PID_FILE=${TEMP_PATH}/pid
 
+if [ -f "${PID_FILE}" ]; then
+    # 文件存在 可能上一个测试还未结束
+    exit 0
+fi
+
+
 # 新建目录
 mkdir -p ${TEMP_PATH}
 
@@ -42,11 +48,11 @@ fi
 # socks5 端口
 socks5Port=`echo -n "${resultPort}" | awk -F ',' '{print $1}'`
 
-# 休眠 让程序启动好 
+# 休眠 让程序启动好
 sleep 3
 
 # 执行测试
-time_total=`curl -x socks5h://127.0.0.1:${socks5Port} --connect-timeout 5 --max-time 5 --retry 2 -o /dev/null -s -w '%{time_total}' https://www.google.com/`
+time_total=`curl -x socks5h://127.0.0.1:${socks5Port} --connect-timeout 5 --max-time 5 --retry 2 -o /dev/null -s -w '%{time_total}' https://www.google.com/ncr`
 # 命令执行结果
 status="$?"
 
@@ -54,7 +60,7 @@ status="$?"
 # 关闭临时代理
 if [ -f "${PID_FILE}" ]; then
     # 关闭 进程
-    for line in $(cat ${PID_FILE}); do kill ${line} 2>/dev/null; done
+    for line in $(cat ${PID_FILE}); do kill -9 ${line} 2>/dev/null; done
 
     # 休眠 让程序关闭
     sleep 1

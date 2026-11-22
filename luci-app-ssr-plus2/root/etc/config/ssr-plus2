@@ -8,46 +8,34 @@ config access_control
 
 config advanced
 
-config advanced_address
-	option alias 'v2fly/domain-list-community'
-	option address 'https://fastly.jsdelivr.net/gh/YW5vbnltb3Vz/domain-list-community@release/gfwlist.txt'
-
-config advanced_address
+config advanced_address '9eae17360d44dc19a8d747783cd49e71'
 	option alias 'Loyalsoldier/v2ray-rules-dat'
 	option address 'https://fastly.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/gfw.txt'
 
-config advanced_address
-	option alias 'Loukky/gfwlist-by-loukky'
-	option address 'https://fastly.jsdelivr.net/gh/Loukky/gfwlist-by-loukky/gfwlist.txt'
-
-config advanced_address
-	option alias 'gfwlist/gfwlist'
-	option address 'https://fastly.jsdelivr.net/gh/gfwlist/gfwlist/gfwlist.txt'
-
-config advanced_address
+config advanced_address 'bf23d326d4c3957cbd5c8b66464621da'
 	option alias 'Clang.CN'
 	option address 'https://ispip.clang.cn/all_cn.txt'
 
-config advanced_address
+config advanced_address '0235e6f04b48107073c01d54beca8e20'
 	option alias 'Clang.CN.CIDR'
 	option address 'https://ispip.clang.cn/all_cn_cidr.txt'
 
-config advanced_address
+config advanced_address '5b2bb45941cba81b6e3a3a966d87d25b'
 	option alias 'china-operator-ip'
 	option address 'https://fastly.jsdelivr.net/gh/gaoyifan/china-operator-ip@ip-lists/china.txt'
 
-config advanced_address
+config advanced_address '11c3b944cf9928a93ed095c6d010bb92'
 	option alias 'Netflix Domain'
 	option address 'https://fastly.jsdelivr.net/gh/lingchenzi/app/media/Netflix_Domain'
 
-config advanced_address
+config advanced_address '417c2e99598690c12b65ee01730d2a0f'
 	option alias 'Netflix IP Only'
 	option address 'https://fastly.jsdelivr.net/gh/QiuSimons/Netflix_IP/NF_only.txt'
 
-config advanced_address
+config advanced_address 'dd59874a9cf9a20cb25b75390acfa020'
 	option alias 'Netflix and AWS'
 	option address 'https://fastly.jsdelivr.net/gh/QiuSimons/Netflix_IP/getflix.txt'
 
-config advanced_address
+config advanced_address 'd4ddf597a68ebfa5b30a98170eb95d70'
 	option alias 'Telegram IP'
 	option address 'https://core.telegram.org/resources/cidr.txt'

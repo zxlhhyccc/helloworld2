@@ -32,33 +32,32 @@ PKG_RELEASE:=1
 LUCI_TITLE:=Socks5/SS/SSR/Vmess/Trojan/NaiveProxy/Vless/Hysteria/Tuic/ShadowTLS/AnyTLS LuCI interface
 LUCI_PKGARCH:=all
 LUCI_DEPENDS:= \
-    +coreutils +coreutils-base64 +curl \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_IPT2Socks:ipt2socks \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_DNS2SOCKS:dns2socks \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_DNS2SOCKS_RUST:dns2socks-rust \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Libev_Client:shadowsocks-libev-ss-local \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Libev_Client:shadowsocks-libev-ss-redir \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Rust_Client:shadowsocks-rust-sslocal \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_ShadowsocksR_Libev_Client:shadowsocksr-libev-ssr-local \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_ShadowsocksR_Libev_Client:shadowsocksr-libev-ssr-redir \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_V2ray:v2ray-core \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_Xray:xray-core \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_Trojan:trojan \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_NaiveProxy:naiveproxy \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_Hysteria:hysteria \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_Tuic_Client:tuic-client \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_Shadow_TLS:shadow-tls \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_Hysteria2:hysteria2 \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_Sing_Box:sing-box \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Simple_Obfs:simple-obfs-client \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_V2ray_Plugin:v2ray-plugin \
-    +PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Xray_Plugin:xray-plugin
+    +curl
+#    +coreutils +coreutils-base64 +curl
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_IPT2Socks:ipt2socks \
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_DNS2SOCKS:dns2socks \
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_DNS2SOCKS_RUST:dns2socks-rust \
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Libev_Client:shadowsocks-libev-ss-local \
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Libev_Client:shadowsocks-libev-ss-redir \
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Rust_Client:shadowsocks-rust-sslocal \
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_ShadowsocksR_Libev_Client:shadowsocksr-libev-ssr-local \
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_ShadowsocksR_Libev_Client:shadowsocksr-libev-ssr-redir \
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_V2ray:v2ray-core \
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_Xray:xray-core \
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_Trojan:trojan \
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_NaiveProxy:naiveproxy \
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_Hysteria:hysteria \
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_Tuic_Client:tuic-client \
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_Shadow_TLS:shadow-tls \
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_Hysteria2:hysteria2 \
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_Sing_Box:sing-box \
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Simple_Obfs:simple-obfs-client \
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_V2ray_Plugin:v2ray-plugin \
+#    +PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Xray_Plugin:xray-plugin
 
 
 
 define Package/$(PKG_NAME)/config
-select PACKAGE_luci-lua-runtime if PACKAGE_$(PKG_NAME)
-
 
 choice
     prompt "DNS2socks Selection"

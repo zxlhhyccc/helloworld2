@@ -4,11 +4,9 @@
 'require form';
 'require dom';
 'require rpc';
+'require network';
+'require validation';
 'require poll';
-
-'require tools.firewall as fwtool';
-'require tools.widgets as widgets';
-'require tools.network as nettools';
 
 'require fs';
 
@@ -42,23 +40,145 @@ function renderStatus(stats) {
 
 
 return view.extend({
+    //
+    callLuciDHCPLeases: rpc.declare({
+        object: 'luci-rpc',
+        method: 'getDHCPLeases',
+        expect: { '': {} }
+    }),
+
     // 获取
     callHostHints: rpc.declare({
         object: 'luci-rpc',
         method: 'getHostHints',
         expect: { '': {} }
     }),
-    
+
     load: function() {
         return Promise.all([
-            this.callHostHints(),
+            this.callLuciDHCPLeases(),
+            network.getHostHints(),
+            L.resolveDefault(fs.exec_direct('/usr/libexec/luci-arp'), ''),
+            L.resolveDefault(fs.read('/tmp/luci-client-history.json').then(JSON.parse), {}),
             uci.load(PACKAGE_NAME)
         ]);
     },
 
-    render: function(data) {
-        var hosts = data[0];
+    arpLeases: function(arp) {
+        const leases = [];
+        for (const line of String(arp || '').trim().split(/\n/)) {
+            const fields = line.trim().split(/\s+/);
+            if (fields.length != 6 || fields[5] != 'br-lan' ||
+                !(parseInt(fields[2], 16) & 2) || !validation.parseIPv4(fields[0]) ||
+                !/^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$/i.test(fields[3]) ||
+                fields[3] == '00:00:00:00:00:00' || (parseInt(fields[3].slice(0, 2), 16) & 1))
+                continue;
+            leases.push({ ipaddr: fields[0], macaddr: fields[3].toUpperCase(), interface: fields[5] });
+        }
+        return leases;
+    },
 
+    normalizeRateAddress: function(ip) {
+        ip = ip.replace(/\/\d+$/, '');
+        const v4 = validation.parseIPv4(ip);
+        if (v4)
+            return v4.join('.');
+        const v6 = validation.parseIPv6(ip);
+        return v6 ? v6.map(word => word.toString(16)).join(':') : null;
+    },
+
+    mergeLeases: function(leases, leases6, hints) {
+        const clients = new Map();
+        const owners = new Map();
+        const normalizeMAC = mac => /^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$/i.test(mac || '') &&
+            mac != '00:00:00:00:00:00' && !(parseInt(mac.slice(0, 2), 16) & 1)
+            ? mac.toUpperCase() : null;
+        const addresses = lease => [lease.ipaddr, ...L.toArray(lease.ipaddrs),
+            lease.ip6addr, ...L.toArray(lease.ip6addrs)].filter(Boolean);
+        const addOwner = (ip, mac) => {
+            const address = this.normalizeRateAddress(ip);
+            if (!address || !mac)
+                return;
+            if (!owners.has(address))
+                owners.set(address, new Set());
+            owners.get(address).add(mac);
+        };
+        for (const [mac, host] of Object.entries(hints.hosts || {}))
+            for (const ip of [...L.toArray(host.ipaddrs || host.ipv4), ...L.toArray(host.ip6addrs || host.ipv6)])
+                addOwner(ip, normalizeMAC(mac));
+        for (const lease of [...leases, ...leases6])
+            for (const ip of addresses(lease))
+                addOwner(ip, normalizeMAC(lease.macaddr));
+
+        for (const [family, list] of [[4, leases], [6, leases6]]) {
+            for (const lease of list) {
+                let mac = normalizeMAC(lease.macaddr);
+                if (!mac) {
+                    const matches = new Set();
+                    for (const ip of addresses(lease))
+                        for (const owner of owners.get(this.normalizeRateAddress(ip)) || [])
+                            matches.add(owner);
+                    if (matches.size == 1)
+                        mac = matches.values().next().value;
+                }
+                // DUID/IAID only deduplicate the same unidentified lease and its history;
+                // they never join it to a different IPv4 record based on hostname.
+                const unknown = lease.duid ? [family, lease.duid.toLowerCase(), lease.iaid?.toLowerCase(), lease.interface] :
+                    addresses(lease).length ? [family, ...addresses(lease).map(ip => this.normalizeRateAddress(ip))] : null;
+                const key = mac || (unknown ? JSON.stringify(unknown) : Symbol());
+                if (!clients.has(key))
+                    clients.set(key, { macaddr: mac, hostname: lease.hostname,
+                        ipaddrs: [], ip6addrs: [], interfaces: [], leases: [], leases6: [], activeAddresses: [] });
+                const client = clients.get(key);
+                client.hostname ||= lease.hostname;
+                if (lease.interface && !client.interfaces.includes(lease.interface))
+                    client.interfaces.push(lease.interface);
+                const ips = family == 4 ? client.ipaddrs : client.ip6addrs;
+                for (const ip of addresses(lease)) {
+                    const address = this.normalizeRateAddress(ip);
+                    if (address && !lease._historical && !client.activeAddresses.includes(address))
+                        client.activeAddresses.push(address);
+                    if (address && !ips.some(value => this.normalizeRateAddress(value) == address))
+                        ips.push(ip);
+                }
+                const records = family == 4 ? client.leases : client.leases6;
+                if (!lease._historical && !records.some(record => family == 4 ? record.ipaddr == lease.ipaddr :
+                    record.duid?.toLowerCase() == lease.duid?.toLowerCase() && record.iaid == lease.iaid))
+                    records.push(Object.assign({}, lease, { macaddr: mac }));
+            }
+        }
+        for (const client of clients.values()) {
+            const current = { macaddr: client.macaddr, ipaddrs: client.activeAddresses };
+            client.rateAddresses = client.activeAddresses.length ? this.clientAddresses(current, hints) : [];
+        }
+        return Array.from(clients.values());
+    },
+
+    clientAddresses: function(lease, hints) {
+        if (lease.rateAddresses)
+            return lease.rateAddresses;
+        const host = hints.hosts?.[lease.macaddr?.toUpperCase()] || {};
+        return Array.from(new Set([
+            lease.ipaddr, ...L.toArray(lease.ipaddrs), lease.ip6addr, ...L.toArray(lease.ip6addrs),
+            ...L.toArray(host.ipaddrs || host.ipv4), ...L.toArray(host.ip6addrs || host.ipv6)
+        ].filter(Boolean).map(ip => this.normalizeRateAddress(ip)).filter(Boolean)));
+    },
+
+    render: function([dhcp_leases, host_hints, arp, history]) {
+        // luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/40_dhcp.js
+        const arpClients = this.arpLeases(arp);
+        const leases = [...(Array.isArray(dhcp_leases.dhcp_leases) ? dhcp_leases.dhcp_leases : []),
+            ...arpClients,
+            ...(Array.isArray(history?.dhcp_leases) ? history.dhcp_leases : []).map(lease => ({ ...lease, _historical: true }))];
+        const leases6 = [...(Array.isArray(dhcp_leases.dhcp6_leases) ? dhcp_leases.dhcp6_leases : []),
+            ...(Array.isArray(history?.dhcp6_leases) ? history.dhcp6_leases : []).map(lease => ({ ...lease, _historical: true }))];
+
+        
+        const clients = this.mergeLeases(leases, leases6, host_hints);
+        
+        const machints = host_hints.getMACHints(false);
+        
+        // alert(JSON.stringify(clients));
 
         // 获取订阅服务器 数据
         var subscribe = uci.sections(PACKAGE_NAME, 'subscribe');
@@ -222,38 +342,19 @@ return view.extend({
             option.value(section['.name'], (subscribeMap[section['group_hash']] || _("Default Group")) + '_' + section['protocol'] + '_' + section['alias']);
         });
 
-        
+
         // 内网 IP 列表选择
         option = section.taboption('general', form.DynamicList, 'proxy_device', _('Proxy Internal Device'));
         // 只展示在弹出框
         option.modalonly = true;
         
-        for (var key in hosts) {
-            var value = hosts[key];
-            var name = value.name;
-            if ( name == undefined || name == '' ) {
-                continue;
-            }
-            // console.log(key);
-            // console.log(value)
+        clients.map(client => {
+            // alert(JSON.stringify(client));
+            const hint = machints.find(h => h[0].toUpperCase() == client.macaddr);
+			const host = client.hostname || hint?.[1];
             
-            // option.value(value.ipaddrs.concat(value.ip6addrs), name);
-            option.value(name, name);
-        }
-        
-        // // 过滤列表
-        // var choices = fwtool.transformHostHints('ipv4', hosts);
-        // // 循环 节点列表
-        // for (var i = 0; i < choices[0].length; i++) {
-        //     option.value(choices[0][i], choices[1][choices[0][i]]);
-        // }
-        // 
-        // // 过滤列表
-        // var choices = fwtool.transformHostHints('ipv6', hosts);
-        // // 循环 节点列表
-        // for (var i = 0; i < choices[0].length; i++) {
-        //     option.value(choices[0][i], choices[1][choices[0][i]]);
-        // }
+            option.value(client.macaddr, host + '(' + client.ipaddrs?.[0] + ')');
+        });
 
 
         // 代理地址列表

@@ -13,10 +13,8 @@ script.type = "text/javascript";
 script.src = L.resource('ssr-plus2/crypto-js.js');
 document.head.appendChild(script);
 
-
 // 包名
 var PACKAGE_NAME = 'ssr-plus2';
-
 // 默认分组名称
 var defaultGroupName = 'default';
 // 默认分组hash
@@ -29,10 +27,15 @@ var defaultGroupHash;
  */
 function createNodeName(nodeData) {
     // 组成成字符串
-    var string;
+    var string = "";
     if (nodeData && Object.keys(nodeData).length > 0) {
         // 订阅节点更新
-        string = (nodeData['group_hash'] || '') +  (nodeData['protocol'] || '') + (nodeData['server'] || '') + (nodeData['server_port'] || '');
+        for(var key in nodeData) {
+            if('alias' === key) {
+                continue;
+            }
+            string = string + (nodeData[key] || '');
+        }
     } else {
         // 手动添加
         string = new Date().getTime() + "" + (Math.random() * 0xFFFFFF);
@@ -65,7 +68,6 @@ function setNodeData(section_id, nodeData) {
 function updateNodeData(section_id, nodeData) {
     if (null != section_id) {
         // 有 section_id 新增/编辑
-
         // change 事件
         var changeEvent = document.createEvent("HTMLEvents").initEvent("change", true, true);
         if (!changeEvent) {
@@ -84,15 +86,13 @@ function updateNodeData(section_id, nodeData) {
 
             // 获取 div 节点
             var targetDivElement = document.getElementById('cbid.ssr-plus2.' + section_id + '.' + name + '');
-            
             // 没有值
             if (!targetDivElement) {
                 continue;
             }
-            
+
             // 目标 节点
             var targetElement = targetDivElement.getElementsByTagName('input')[0];
-            
             if (!targetElement) {
                 // select
                 targetElement = targetDivElement.getElementsByTagName('select')[0];
@@ -290,6 +290,15 @@ var viewExtend = view.extend({
         option.rmempty = false;
         // table中需要 可编辑
         option.editable = true;
+
+
+        // 原始 添加方法
+        var originSubscribeHandleAdd = section.handleAdd;
+        // 自定义 添加方法
+        section.handleAdd = function(ev, name) {
+            // 自定义 name
+            originSubscribeHandleAdd.apply(this, [ev, createNodeName([])]);
+        };
 
 
         // 原始 删除方法
@@ -629,7 +638,7 @@ var viewExtend = view.extend({
 
             
             // 分组
-            option = subSection.option(form.ListValue, 'group_hash', _('group'));
+            option = subSection.option(form.ListValue, 'group_hash', _('Group'));
             // 只展示在弹出框
             option.modalonly = true;
             
@@ -2965,8 +2974,8 @@ function filterAlias(alias) {
  */
 function toURL(rawUrl) {
     try {
-        var url = new URL("https://" + rawUrl);
-
+        // 这里使用ss作为协议 避免用https 443端口会自动忽略 http 同理
+        var url = new URL("ss://" + rawUrl);
         if (url.hostname) {
             // 有 hostname
             // 查询 位置

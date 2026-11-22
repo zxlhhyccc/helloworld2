@@ -4,53 +4,34 @@ local json = require "luci.jsonc"
 local sys  = require "luci.sys"
 
 
--- 获取信息
-local hosts = sys.exec('ubus call luci-rpc getHostHints')
+-- 设备MAC
+local device_mac = arg[1]
 
--- 设备名称
-local device_name = arg[1]
-
-if device_name == nil or string.len(device_name) == 0 then
-    print("")
+if device_mac == nil or string.len(device_mac) == 0 then
     -- 退出
     os.exit(0)
 end
 
--- print("hosts")
--- print(hosts)
--- print(device_name)
+
+-- 获取信息
+local host_hints = sys.exec('ubus call luci-rpc getHostHints')
+
 
 -- json 解析
 local parse = json.new()
 -- 处理
-done, err = parse:parse(hosts)
+done, err = parse:parse(host_hints)
 
--- print("done")
--- print(done)
--- print("err")
--- print(err)
-
-local jsonTable = parse:get()
--- print("json")
--- print(jsonTable)
-
--- print(json.stringify(jsonTable))
+local host_hints_json = parse:get()
 
 -- 循环
-for k, v in pairs(jsonTable) do
-    if (device_name == v.name) then
-        -- 与要查找的相同
-        -- print(k)
-        -- print(v)
-
+for k, v in pairs(host_hints_json) do
+    if (device_mac == k) then
         -- ipv4
         local ipaddrs = v.ipaddrs
         -- ipv6
         local ip6addrs = v.ip6addrs
-        
-        -- print(json.stringify(ipaddrs))
-        -- print(json.stringify(ip6addrs))
-        
+
         -- 输出ip
         print(table.concat(ipaddrs, ' ') .. ' ' .. table.concat(ip6addrs, ' '))
         -- 退出

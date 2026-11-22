@@ -162,8 +162,17 @@ local methods = {
                 local alias = section['alias']
                 -- 地址
                 local address = section['address']
-                -- 地址 MD5
-                local md5String = md5_string(address)
+                -- 是否 base64
+                local isBase64 = section['is_base64']
+                if not isBase64 then
+                    isBase64 = "0"
+                end
+
+
+                -- 保存
+                table.insert(updateFileName, name)
+
+
                 -- 状态
                 local status
                 -- 描述
@@ -175,37 +184,47 @@ local methods = {
                     -- 继续下一个
                     return
                 end
-                
-                
-                
+
+
                 -- 调用 curl
                 local raw, new_md5 = curl(address)
-                
-                
+
+
                 -- 文件名称
-                local saveFile = savePath .. md5String
-                
-                -- 保存
-                table.insert(updateFileName, md5String)
-                
-                
-                
+                local saveFile = savePath .. name
+
+
                 if #raw > 0 then
                     -- 有数据
-                    -- 解码
-                    local decode = base64DecodeIfNeed(raw)
+                    -- 处理后数据
+                    local writeData = ""
+                    if isBase64 == "1" then
+                        -- base64 编码
+                        -- 解码
+                        writeData = base64DecodeIfNeed(raw)
+                        
+                        if not writeData then
+                            -- 解码失败
+                            status = 1
+                            message = "base64解码失败"
+                        end
+                    else
+                        -- 非 base64 编码
+                        writeData = raw
+                    end
                     
-                    if #decode > 0 then
+                    
+                    if #writeData > 0 then
                         -- 先删除
                         -- fs.remove(saveFile)
                         
                         -- 写入文件 添加 最后一个换行 解决shell 读取问题
-                        fs.writefile(saveFile, decode .. "\n")
+                        fs.writefile(saveFile, writeData .. "\n")
                         
                         -- 删除注释
                         -- local comment_pattern = "^[!\\[@]+"
                                                
-
+                    
                         -- 删除 [ 或 ! 或 @ 或 . 或 / 开头数据
                         -- 删除空格
                         -- 替换 | 替换为空
@@ -219,22 +238,17 @@ local methods = {
                         
                         -- 设置更新时间
                         ucic:set(PACKAGE_NAME, name, 'update_time', os.date("%Y-%m-%d %H:%M:%S"))
-                    else
-                        status = 1
-                        message = "base64解码失败"
                     end
-                    
                 else
                     status = 1
                     message = "下载失败"
                 end
-                
-                
+
+
                 -- 结果
                 local result  = {
                     alias     = alias,
                     address   = address,
-                    md5String = md5String,
                     status    = status,
                     message   = message
                 }
@@ -248,8 +262,8 @@ local methods = {
             ucic:commit(PACKAGE_NAME)
             
 
-            if isNotEmpty == false then
-                -- 全部 更新才需要清理
+            -- if isNotEmpty == false then
+                -- 清理文件
                 -- 列出 存在 的 文件
                 local existFileIterate = fs.dir(savePath)
                 
@@ -263,7 +277,7 @@ local methods = {
                         fs.remove(savePath .. existFileName)
                     end
                 end
-            end
+            -- end
 
 
 
